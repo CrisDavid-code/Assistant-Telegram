@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#0f766e" />
+    <meta name="description" content="Organiza tu vida personal, tus finanzas y tu trabajo en un solo lugar." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <title>Aguiteks LifeOS</title>
+    <script>
+      // Tema antes de pintar (sin parpadeo).
+      try { var t = localStorage.getItem('lifeos.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>Aguiteks LifeOS necesita JavaScript.</noscript>
+    <script>
+      // Navegadores sin BigInt/fetch no pueden usar Firestore: se explica cómo actualizar.
+      if (typeof BigInt === 'undefined' || typeof fetch === 'undefined') {
+        document.getElementById('root').innerHTML = '<div class="old" style="padding:24px!important;font-family:system-ui!important"><h1 style="font-size:20px!important">Tu navegador necesita actualizarse</h1><p>Instala o actualiza Google Chrome para usar Aguiteks LifeOS.</p></div>';
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

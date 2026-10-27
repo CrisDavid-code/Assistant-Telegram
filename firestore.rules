@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// Aguiteks LifeOS — reglas de Firestore.
+// Principio: los clientes SOLO LEEN. Toda escritura pasa por Cloud Functions (servicios de dominio con su
+// propia autorización), así PWA y Telegram aplican exactamente las mismas reglas de negocio.
+// La tabla de lectura por rol replica packages/contracts/src/permissions.ts (mantener sincronizadas).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function member(sid) { return get(/databases/$(database)/documents/spaces/$(sid)/members/$(request.auth.uid)).data; }
+    // Un solo get por evaluación: sin documento, get() falla y la regla deniega.
+    function roleIn(sid, roles) {
+      let m = member(sid);
+      return signedIn() && m.status == 'active' && m.role in roles;
+    }
+    function coreReader(sid) { return roleIn(sid, ['owner', 'admin', 'supervisor', 'member', 'viewer']); }
+    function financeReader(sid) { return roleIn(sid, ['owner', 'admin', 'supervisor']); }
+    function manager(sid) { return roleIn(sid, ['owner', 'admin']); }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /spaces/{sid} {
+      allow read: if coreReader(sid);
+
+      // Cada quien ve su propia membresía (incluida una invitación pendiente); los miembros ven al equipo.
+      match /members/{uid} {
+        allow read: if (signedIn() && uid == request.auth.uid) || coreReader(sid);
+      }
+      match /{col}/{id} {
+        allow read: if (col in ['tasks', 'reminders', 'contacts', 'activities', 'projects'] && coreReader(sid))
+          || (col in ['accounts', 'transactions', 'obligations', 'budgets'] && financeReader(sid))
+          || (col in ['audit', 'usage'] && manager(sid));
+      }
+    }
+
+    // Consulta "mis espacios": collectionGroup('members').where('uid', '==', miUid)
+    match /{path=**}/members/{m} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // Todo lo demás (códigos de vinculación, conversaciones, idempotencia, límites) solo lo usa el backend.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

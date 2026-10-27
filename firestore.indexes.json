@@ -1,0 +1,18 @@
+{
+  "indexes": [
+    { "collectionGroup": "members", "queryScope": "COLLECTION_GROUP", "fields": [{ "fieldPath": "uid", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }] },
+    { "collectionGroup": "reminders", "queryScope": "COLLECTION_GROUP", "fields": [{ "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "dueAt", "order": "ASCENDING" }] },
+    { "collectionGroup": "reminders", "queryScope": "COLLECTION_GROUP", "fields": [{ "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "lockedUntil", "order": "ASCENDING" }] },
+    { "collectionGroup": "reminders", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "scheduledFor", "order": "ASCENDING" }] },
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "dueAt", "order": "ASCENDING" }] },
+    { "collectionGroup": "tasks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "contacts", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "archived", "order": "ASCENDING" }, { "fieldPath": "nameLower", "order": "ASCENDING" }] },
+    { "collectionGroup": "obligations", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "dueAt", "order": "ASCENDING" }] },
+    { "collectionGroup": "accounts", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "archived", "order": "ASCENDING" }, { "fieldPath": "name", "order": "ASCENDING" }] }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "members", "fieldPath": "uid", "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }, { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }] },
+    { "collectionGroup": "telegramUpdates", "fieldPath": "expireAt", "ttl": true, "indexes": [] },
+    { "collectionGroup": "rateLimits", "fieldPath": "expireAt", "ttl": true, "indexes": [] }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "aguiteks-lifeos",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/contracts", "functions", "apps/web"],
+  "engines": { "node": "22" },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run packages functions/src",
+    "test:emu": "firebase emulators:exec --only firestore,auth --project demo-lifeos \"vitest run tests --no-file-parallelism\"",
+    "build": "npm run build -w functions && npm run build -w apps/web",
+    "dev:web": "npm run dev -w apps/web",
+    "emulators": "firebase emulators:start --project demo-lifeos"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase-tools": "^15.34.1",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

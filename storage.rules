@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// Sin acceso directo de clientes. Los documentos privados (Fase 7) se servirán con URLs firmadas de
+// corta duración emitidas por el backend tras verificar la membresía.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

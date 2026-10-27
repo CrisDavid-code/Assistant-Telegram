@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { handleUpdate, type TgUpdate } from '../functions/src/telegram/bot';
 import { telegramWebhook } from '../functions/src/telegram/webhook';
 import { Timestamp } from '../functions/src/shared/firebase';
+import { setLLM } from '../functions/src/ai/provider';
 import { clearAll, db, makeUser, rid, sent } from './helpers';
 
 const CHAT = 5550001;
@@ -14,6 +15,7 @@ const button = (label: RegExp) => last().keyboard!.flat().find((b) => label.test
 beforeEach(async () => {
   await clearAll();
   sent.length = 0;
+  setLLM(null); // sin IA salvo que la prueba la simule
 });
 
 async function linked() {
@@ -147,5 +149,32 @@ describe('webhook', () => {
     expect(await call(upd, 'secreto-de-prueba')).toBe(200);
     expect(await call(upd, 'secreto-de-prueba')).toBe(200);
     expect(sent).toHaveLength(1);
+  });
+});
+
+describe('IA (proveedor simulado)', () => {
+  const photo = (): TgUpdate => ({ update_id: updateId++, message: { message_id: 9, chat: { id: CHAT, type: 'private' }, photo: [{ file_id: 'p', file_size: 1000 }] } });
+
+  it('la salida inválida de la IA se descarta; la válida se propone y requiere confirmación', async () => {
+    const { a } = await linked();
+    setLLM({ name: 'falso', interpret: async () => ({ type: 'expense', amount: -5 }) as never });
+    await handleUpdate(text('frase rarísima que las reglas no entienden'));
+    expect(last().text).toMatch(/No entendí/);
+    setLLM({ name: 'falso', interpret: async () => ({ type: 'expense', amount: 4500, currency: 'GTQ', category: 'alimentacion', description: 'Tacos', date: undefined }) as never });
+    await handleUpdate(text('otra frase rarísima'));
+    expect(last().text).toMatch(/Voy a registrar un gasto de Q\s?45\.00/);
+    expect((await db.collection(`spaces/${a.personalSpaceId}/transactions`).get()).size).toBe(0);
+    setLLM(null);
+  });
+
+  it('un recibo en imagen genera una propuesta, nunca un registro directo', async () => {
+    const { a } = await linked();
+    setLLM({ name: 'falso', interpret: async () => ({ type: 'unknown' }), extractFromImage: async () => ({ type: 'expense', amount: 23050, currency: 'GTQ', category: 'alimentacion', description: 'Supermercado' }) as never });
+    await handleUpdate(photo());
+    expect(last().text).toMatch(/Q\s?230\.50.*¿Confirmas\?/s);
+    expect((await db.collection(`spaces/${a.personalSpaceId}/transactions`).get()).size).toBe(0);
+    await handleUpdate(tap(button(/Confirmar/)));
+    expect((await db.collection(`spaces/${a.personalSpaceId}/transactions`).get()).size).toBe(1);
+    setLLM(null);
   });
 });

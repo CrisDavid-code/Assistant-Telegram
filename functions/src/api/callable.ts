@@ -11,7 +11,7 @@ export function toHttpsError(err: unknown, op: string): HttpsError {
   return new HttpsError('internal', 'Ocurrió un error inesperado. Inténtalo de nuevo.');
 }
 
-export const api = onCall({ region: 'us-central1', memory: '256MiB', timeoutSeconds: 60 }, async (req) => {
+export const api = onCall({ region: 'us-central1', memory: '256MiB', timeoutSeconds: 60, secrets: ['ANTHROPIC_API_KEY'] }, async (req) => {
   if (!req.auth) throw new HttpsError('unauthenticated', 'Inicia sesión para continuar.');
   const { op, spaceId, data } = (req.data ?? {}) as { op?: string; spaceId?: string; data?: unknown };
   try {

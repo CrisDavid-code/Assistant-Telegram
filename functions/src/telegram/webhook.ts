@@ -12,7 +12,7 @@ const sameSecret = (a: string, b: string) => a.length === b.length && timingSafe
  * X-Telegram-Bot-Api-Secret-Token; sin él (o distinto) se rechaza.
  */
 export const telegramWebhook = onRequest(
-  { region: 'us-central1', memory: '256MiB', timeoutSeconds: 60, secrets: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_WEBHOOK_SECRET'] },
+  { region: 'us-central1', memory: '256MiB', timeoutSeconds: 60, secrets: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_WEBHOOK_SECRET', 'ANTHROPIC_API_KEY'] },
   async (req, res) => {
     const expected = process.env.TELEGRAM_WEBHOOK_SECRET ?? '';
     if (req.method !== 'POST') {

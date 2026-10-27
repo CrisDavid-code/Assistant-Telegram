@@ -9,7 +9,7 @@ const out = process.argv[2] ?? '.';
   p.on('pageerror', (e) => errors.push(e.message));
   p.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   const step = async (name, fn) => { try { await fn(); console.log('✓', name); } catch (e) { console.log('✗', name, e.message.split('\n')[0]); await p.screenshot({ path: `${out}/fail-${name.replace(/\W+/g, '_')}.png` }); throw e; } };
-  await p.goto('process.env.APP_URL ?? 'http://127.0.0.1:5173/'');
+  await p.goto(process.env.APP_URL ?? 'http://127.0.0.1:5173/');
   await step('redirige a login', () => p.getByRole('heading', { name: 'Aguiteks LifeOS' }).waitFor());
   await step('registro', async () => {
     await p.getByRole('button', { name: 'Crear una cuenta' }).click();

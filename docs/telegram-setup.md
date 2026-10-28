@@ -8,22 +8,22 @@
 
 ## 2. Secretos y variables
 ```bash
-firebase functions:secrets:set TELEGRAM_BOT_TOKEN        # pega el token
-openssl rand -hex 32 | firebase functions:secrets:set TELEGRAM_WEBHOOK_SECRET --data-file=-
-echo "TELEGRAM_BOT_USERNAME=AguiteksLifeOSBot" >> functions/.env
-echo "APP_URL=https://tu-dominio" >> functions/.env
+cd worker
+npx wrangler secret put TELEGRAM_BOT_TOKEN                     # pega el token
+openssl rand -hex 32 | npx wrangler secret put TELEGRAM_WEBHOOK_SECRET   # guárdalo también para el paso 3
+# en worker/wrangler.toml → [vars]: TELEGRAM_BOT_USERNAME = "AguiteksLifeOSBot", APP_URL = "https://tu-dominio"
 ```
 En la PWA: `VITE_TELEGRAM_BOT_USERNAME=AguiteksLifeOSBot` en `apps/web/.env.production`.
 
 ## 3. Desplegar y registrar el webhook
 ```bash
-firebase deploy --only functions
+cd worker && npx wrangler deploy && cd ..
 TELEGRAM_BOT_TOKEN=... TELEGRAM_WEBHOOK_SECRET=... \
-WEBHOOK_URL=https://us-central1-<proyecto>.cloudfunctions.net/telegramWebhook \
+WEBHOOK_URL=https://aguiteks-lifeos.<subdominio>.workers.dev/telegram \
 node scripts/telegram-setup.mjs
 ```
 El script ejecuta `setWebhook` (con `secret_token`), `setMyCommands` (español) y `getWebhookInfo`.
-La URL exacta aparece en la salida de `firebase deploy`.
+La URL exacta aparece en la salida de `wrangler deploy`.
 
 ## 4. Vinculación (usuario)
 1. PWA → Configuración → Telegram → **Generar código** (10 min, un solo uso).

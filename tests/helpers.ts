@@ -1,13 +1,16 @@
 // Utilidades para pruebas contra los emuladores (Firestore + Auth). Nunca apuntan a producción:
 // el proyecto "demo-*" no existe en Google y firebase-admin usa los emuladores por las variables de entorno.
+import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { db } from '../functions/src/shared/firebase';
-import { runOp, type Caller } from '../functions/src/api/registry';
-import { setTelegramClient, type InlineKeyboard } from '../functions/src/telegram/api';
-import '../functions/src/ai/assistant';
+import { db } from '../worker/src/shared/firebase';
+import { runOp, type Caller } from '../worker/src/api/registry';
+import { setTelegramClient, type InlineKeyboard } from '../worker/src/telegram/api';
+import '../worker/src/ai/assistant';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Ejecuta con `npm run test:emu` (emuladores).');
-export const PROJECT = process.env.GCLOUD_PROJECT ?? 'demo-lifeos';
+export const PROJECT = process.env.FIREBASE_PROJECT_ID ?? 'demo-lifeos';
+// firebase-admin solo se usa en pruebas para crear usuarios en el emulador de Auth.
+initializeApp({ projectId: PROJECT });
 
 export async function clearAll() {
   await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, { method: 'DELETE' });

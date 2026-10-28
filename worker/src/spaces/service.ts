@@ -1,8 +1,8 @@
-import { getAuth } from 'firebase-admin/auth';
 import { PLANS, type Currency, type MemberDoc, type OpData, type SpaceDoc, type Source, type UserDoc } from '@lifeos/contracts';
 import { db, FieldValue } from '../shared/firebase';
 import { fail } from '../shared/errors';
 import { audit } from '../shared/audit';
+import { userByEmail } from '../shared/google-auth';
 import { requirePerm, type Ctx } from '../auth/context';
 
 
@@ -85,7 +85,7 @@ export async function inviteMember(ctx: Ctx, input: OpData<'member.invite'>) {
   requirePerm(ctx, 'members.manage');
   if (ctx.space.type === 'personal') fail('failed-precondition', 'El espacio personal no admite miembros. Crea un espacio de empresa.');
   if (input.role === 'admin' && ctx.role !== 'owner') fail('permission-denied', 'Solo el propietario puede nombrar administradores.');
-  const target = await getAuth().getUserByEmail(input.email).catch(() => null);
+  const target = await userByEmail(input.email);
   if (!target) fail('not-found', 'Esa persona aún no tiene cuenta en Aguiteks LifeOS. Pídele que se registre primero.');
   const ref = memberRef(ctx.spaceId, target!.uid);
   return db.runTransaction(async (tx) => {

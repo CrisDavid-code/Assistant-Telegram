@@ -1,7 +1,7 @@
 # Seguridad y privacidad
 
 ## Autenticación
-- Firebase Authentication (correo/contraseña, restablecimiento por correo). El callable `api` rechaza llamadas sin token.
+- Firebase Authentication (correo/contraseña, restablecimiento por correo). `POST /api` exige un ID token de Firebase verificado en el Worker (firma de Google, emisor, audiencia y vigencia con `jose`). El modo sin firma solo se activa si se apunta al emulador de Auth.
 - Telegram: identidad solo por vínculo verificado (`telegramLinks/{chatId}`), creado con un código de un solo uso.
 
 ## Autorización
@@ -15,14 +15,14 @@
 | Escribir finanzas | ✓ | ✓ | | | |
 | Gestionar miembros / espacio, ver auditoría | ✓ | ✓ | | | |
 
-- El backend usa Admin SDK (salta reglas), por eso **cada servicio** llama `requirePerm` y `loadCtx` verifica membresía `active` y espacio `active`. El `spaceId` del cliente solo selecciona.
+- El Worker usa una cuenta de servicio (salta reglas), por eso **cada servicio** llama `requirePerm` y `loadCtx` verifica membresía `active` y espacio `active`. El `spaceId` del cliente solo selecciona.
 - Nadie modifica al propietario; solo el propietario nombra o modifica administradores; el espacio personal no admite miembros; quitar un miembro no transfiere datos.
 - Planes ≠ permisos: el plan limita cuotas (`subscriptions/quota.ts`), los roles limitan datos.
 
 ## Reglas de Firestore y Storage
 - Denegación por defecto. Clientes: **solo lectura** según rol; ninguna escritura directa (`firestore.rules`).
 - Colecciones internas (`telegramLinkCodes`, `conversations`, `telegramLinks`, `rateLimits`) inaccesibles.
-- Storage: todo denegado hasta implementar documentos privados (Fase 7) con URLs firmadas de corta duración.
+- Archivos: Cloud Storage para Firebase exige facturación en proyectos nuevos; los documentos privados (Fase 7) se guardarán en Cloudflare R2 (10 GB gratis) con URLs firmadas de corta duración.
 - Probado en `tests/rules.test.ts` y `tests/security.test.ts`.
 
 ## Vinculación de Telegram
@@ -41,7 +41,8 @@
 - Al proveedor se envía solo el mensaje actual, la fecha y la zona horaria; nunca historial ni datos guardados.
 
 ## Secretos
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `ANTHROPIC_API_KEY` en Secret Manager. La configuración web de Firebase es pública por diseño.
+- `FIREBASE_SERVICE_ACCOUNT`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `ANTHROPIC_API_KEY` como secretos cifrados del Worker. Cuenta de servicio con roles mínimos (Cloud Datastore User, Firebase Authentication Viewer).
+- CORS: `/api` solo acepta los orígenes de `ALLOWED_ORIGINS`. La configuración web de Firebase es pública por diseño.
 - `.env*` locales ignorados por git.
 
 ## Auditoría

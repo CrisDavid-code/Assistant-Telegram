@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import type { OpData, Recurrence, ReminderDoc, UserDoc } from '@lifeos/contracts';
 import { db, FieldValue, Timestamp, type Tx } from '../shared/firebase';
+import type { DocRef } from '../shared/firestore';
 import { fail } from '../shared/errors';
 import { audit } from '../shared/audit';
 import { nextOccurrence, zoned } from '../shared/time';
@@ -74,7 +75,7 @@ export const cancelReminder = (ctx: Ctx, input: OpData<'reminder.cancel'>) =>
 // Entrega al menos una vez: si el proceso muere después de enviar y antes de guardar, puede repetirse.
 
 /** Toma un recordatorio en exclusiva. Devuelve la versión tomada o null si ya no corresponde enviarlo. */
-async function claim(ref: FirebaseFirestore.DocumentReference, now: Date) {
+async function claim(ref: DocRef, now: Date) {
   return db.runTransaction(async (tx) => {
     const r = (await tx.get(ref)).data() as ReminderDoc | undefined;
     if (!r) return null;
@@ -87,7 +88,7 @@ async function claim(ref: FirebaseFirestore.DocumentReference, now: Date) {
 }
 
 /** Guarda el resultado solo si nadie reprogramó/canceló mientras se enviaba (misma versión y aún "sending"). */
-async function finish(ref: FirebaseFirestore.DocumentReference, version: number, patch: Record<string, unknown>) {
+async function finish(ref: DocRef, version: number, patch: Record<string, unknown>) {
   await db.runTransaction(async (tx) => {
     const r = (await tx.get(ref)).data() as ReminderDoc | undefined;
     if (!r || r.version !== version || r.status !== 'sending') return;
@@ -95,7 +96,7 @@ async function finish(ref: FirebaseFirestore.DocumentReference, version: number,
   });
 }
 
-export async function deliverReminder(ref: FirebaseFirestore.DocumentReference, now = new Date()) {
+export async function deliverReminder(ref: DocRef, now = new Date()) {
   const r = await claim(ref, now);
   if (!r) return 'skipped';
   const user = (await db.doc(`users/${r.userId}`).get()).data() as UserDoc | undefined;

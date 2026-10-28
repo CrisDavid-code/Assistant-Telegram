@@ -1,5 +1,5 @@
 // Registra el webhook y los comandos del bot. Uso (los valores NO se guardan en el repo):
-//   TELEGRAM_BOT_TOKEN=... TELEGRAM_WEBHOOK_SECRET=... WEBHOOK_URL=https://<region>-<proyecto>.cloudfunctions.net/telegramWebhook node scripts/telegram-setup.mjs
+//   TELEGRAM_BOT_TOKEN=... TELEGRAM_WEBHOOK_SECRET=... WEBHOOK_URL=https://aguiteks-lifeos.<tu-subdominio>.workers.dev/telegram node scripts/telegram-setup.mjs
 const { TELEGRAM_BOT_TOKEN: token, TELEGRAM_WEBHOOK_SECRET: secret, WEBHOOK_URL: url } = process.env;
 if (!token || !secret || !url) {
   console.error('Faltan TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET o WEBHOOK_URL.');

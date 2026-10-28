@@ -1,4 +1,4 @@
-// Contratos de la API (callable `api`). PWA y Telegram llaman a los mismos servicios con estas entradas.
+// Contratos de la API (POST /api del Worker). PWA y Telegram llaman a los mismos servicios con estas entradas.
 import { z } from 'zod';
 import { CURRENCY_CODES, MAX_AMOUNT_MINOR } from './money';
 import { ASSIGNABLE_ROLES } from './permissions';
@@ -51,7 +51,7 @@ const contactFields = {
   relation: z.enum(CONTACT_RELATIONS).default('other'),
 };
 
-/** Operaciones disponibles. La autorización de cada una vive en functions/src/api/registry.ts. */
+/** Operaciones disponibles. La autorización de cada una vive en worker/src/api/registry.ts. */
 export const OPS = {
   'user.bootstrap': z.object({ displayName: optTxt(60), timezone: zTimezone.optional(), currency: zCurrency.optional() }),
   'user.setDefaultSpace': z.object({ spaceId: zId }),

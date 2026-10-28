@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
-import { loadCtx } from '../functions/src/auth/context';
-import { recomputeBalance } from '../functions/src/finance/service';
+import { loadCtx } from '../worker/src/auth/context';
+import { recomputeBalance } from '../worker/src/finance/service';
 import { clearAll, db, expectDenied, makeUser, rid, type TestUser } from './helpers';
 
 beforeEach(clearAll);

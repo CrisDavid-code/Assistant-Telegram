@@ -1,4 +1,4 @@
-import { logger } from 'firebase-functions';
+import { logger } from '../shared/log';
 import { rulesProvider } from './rules';
 import { claudeProvider } from './claude';
 import { zIntent, type AIProvider, type Intent, type InterpretContext } from './types';

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { handleUpdate, type TgUpdate } from '../functions/src/telegram/bot';
-import { telegramWebhook } from '../functions/src/telegram/webhook';
-import { Timestamp } from '../functions/src/shared/firebase';
-import { setLLM } from '../functions/src/ai/provider';
+import { handleUpdate, type TgUpdate } from '../worker/src/telegram/bot';
+import { handleTelegram } from '../worker/src/telegram/webhook';
+import { Timestamp } from '../worker/src/shared/firebase';
+import { setLLM } from '../worker/src/ai/provider';
 import { clearAll, db, makeUser, rid, sent } from './helpers';
 
 const CHAT = 5550001;
@@ -135,11 +135,8 @@ describe('lenguaje natural y confirmaciones', () => {
 });
 
 describe('webhook', () => {
-  function call(body: unknown, secret?: string) {
-    const res = { code: 0, status(c: number) { this.code = c; return this; }, end() { return this; } };
-    const req = { method: 'POST', body, get: (h: string) => (h.toLowerCase() === 'x-telegram-bot-api-secret-token' ? secret : undefined), headers: {} };
-    return (telegramWebhook as unknown as (q: unknown, r: typeof res) => Promise<void>)(req, res).then(() => res.code);
-  }
+  const call = (body: unknown, secret?: string) =>
+    handleTelegram(new Request('http://worker/telegram', { method: 'POST', body: JSON.stringify(body), headers: secret ? { 'x-telegram-bot-api-secret-token': secret } : {} })).then((r) => r.status);
 
   it('rechaza sin secreto y procesa una sola vez cada update_id', async () => {
     process.env.TELEGRAM_WEBHOOK_SECRET = 'secreto-de-prueba';

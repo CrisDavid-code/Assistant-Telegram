@@ -1,4 +1,4 @@
-import { logger } from 'firebase-functions';
+import { logger } from '../shared/log';
 import { formatMoney, type MemberDoc, type UserDoc } from '@lifeos/contracts';
 import { db, FieldValue, Timestamp } from '../shared/firebase';
 import { DomainError } from '../shared/errors';

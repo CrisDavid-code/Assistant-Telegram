@@ -1,7 +1,7 @@
 # Proveedores de IA
 
 ## Diseño
-`AIProvider` (`functions/src/ai/types.ts`): `interpret`, `transcribe?`, `extractFromImage?`. Lo que un proveedor no implementa se informa al usuario como «no configurado»; nunca se simula.
+`AIProvider` (`worker/src/ai/types.ts`): `interpret`, `transcribe?`, `extractFromImage?`. Lo que un proveedor no implementa se informa al usuario como «no configurado»; nunca se simula.
 
 | Proveedor | Archivo | Capacidades | Costo |
 |---|---|---|---|
@@ -17,7 +17,7 @@ Orden: reglas primero; si devuelven `unknown` y hay IA configurada, se consulta 
 - Se envía solo el mensaje actual, fecha/hora y zona del espacio. Las imágenes se envían en base64 y no se guardan.
 - Activación: secreto `ANTHROPIC_API_KEY` con una clave real (`sk-ant-…`). Cualquier otro valor (p. ej. `disabled`) la desactiva.
   ```bash
-  firebase functions:secrets:set ANTHROPIC_API_KEY
+  cd worker && npx wrangler secret put ANTHROPIC_API_KEY
   ```
 
 ## Costos y límites

@@ -12,3 +12,6 @@ ui-debug.log*
 functions/.secret.local
 functions/.env.local
 coverage/
+dist/
+.wrangler/
+.dev.vars

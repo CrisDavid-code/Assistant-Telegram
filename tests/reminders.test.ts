@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
-import { deliverReminder, MAX_ATTEMPTS, sweepReminders } from '../functions/src/reminders/service';
-import { Timestamp } from '../functions/src/shared/firebase';
+import { deliverReminder, MAX_ATTEMPTS, sweepReminders } from '../worker/src/reminders/service';
+import { Timestamp } from '../worker/src/shared/firebase';
 import { clearAll, db, expectDenied, makeUser, rid, sent, tg } from './helpers';
 
 const TZ = 'America/Guatemala';

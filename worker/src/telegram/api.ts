@@ -1,4 +1,4 @@
-// Cliente mínimo de la Bot API. El token vive en Secret Manager (TELEGRAM_BOT_TOKEN), nunca en el código ni en logs.
+// Cliente mínimo de la Bot API. El token es un secreto del Worker (TELEGRAM_BOT_TOKEN), nunca en el código ni en logs.
 
 export type InlineKeyboard = { text: string; callback_data: string }[][];
 

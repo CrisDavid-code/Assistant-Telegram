@@ -1,0 +1,15 @@
+# Cloudflare Worker de Aguiteks LifeOS (plan gratuito).
+# Secretos (no van aquí): wrangler secret put FIREBASE_SERVICE_ACCOUNT | TELEGRAM_BOT_TOKEN | TELEGRAM_WEBHOOK_SECRET | ANTHROPIC_API_KEY
+name = "aguiteks-lifeos"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+FIREBASE_PROJECT_ID = ""      # id del proyecto de Firebase
+ALLOWED_ORIGINS = ""          # p. ej. https://lifeos.aguiteks.com
+TELEGRAM_BOT_USERNAME = ""    # sin @
+APP_URL = ""                  # URL pública de la PWA
+
+[triggers]
+crons = ["* * * * *"]         # recordatorios: cada minuto

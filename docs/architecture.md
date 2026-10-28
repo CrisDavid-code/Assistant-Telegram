@@ -5,20 +5,24 @@
 ```
  PWA (React)  ──lectura en tiempo real──▶  Firestore  ◀──Admin SDK──┐
      │                (reglas: solo lectura por rol)                  │
-     └──httpsCallable("api", {op, spaceId, data})──▶ Cloud Function api ─┐
-                                                                         ├─▶ runOp() ─▶ servicios de dominio ─▶ Firestore
- Telegram ──webhook HTTPS (secreto)──▶ Cloud Function telegramWebhook ───┘          (transacción + auditoría)
- Cloud Scheduler (cada minuto) ──▶ reminderSweep ──▶ entrega de recordatorios ──▶ Bot API
+     └──fetch POST /api (ID token de Firebase)──▶ Cloudflare Worker ─┐
+                                                                     ├─▶ runOp() ─▶ servicios ─▶ Firestore (REST)
+ Telegram ──webhook HTTPS (secreto)──▶ Worker POST /telegram ────────┘    (transacción + auditoría)
+ Cron Trigger (cada minuto) ──▶ Worker scheduled() ──▶ entrega de recordatorios ──▶ Bot API
+
+ Costo: Firebase Spark (Hosting, Auth, Firestore) + Cloudflare Workers Free = $0
 ```
 
-**Decisión central:** los clientes solo **leen** (con reglas de Firestore); toda **escritura** pasa por `runOp` (`functions/src/api/registry.ts`). Así la PWA, Telegram y la IA aplican exactamente las mismas validaciones, permisos e idempotencia, y no hay dos versiones de las reglas financieras.
+**Decisión central:** los clientes solo **leen** (con reglas de Firestore); toda **escritura** pasa por `runOp` (`worker/src/api/registry.ts`). Así la PWA, Telegram y la IA aplican exactamente las mismas validaciones, permisos e idempotencia, y no hay dos versiones de las reglas financieras.
 
 ## Capas del backend
 
 | Capa | Dónde | Responsabilidad |
 |---|---|---|
-| Adaptadores de entrada | `api/callable.ts`, `telegram/webhook.ts`, `telegram/bot.ts`, `index.ts` (scheduler) | Traducir HTTP/Telegram/cron a operaciones. Sin reglas de negocio |
+| Adaptadores de entrada | `index.ts` (fetch + scheduled), `api/http.ts`, `telegram/webhook.ts`, `telegram/bot.ts` | Traducir HTTP/Telegram/cron a operaciones. Sin reglas de negocio |
 | Contratos | `packages/contracts/src/schemas.ts` | Validar cada entrada con Zod (`OPS`) |
+| Identidad | `shared/google-auth.ts` | Verificar el ID token de Firebase (firma de Google con `jose`); token de la cuenta de servicio para Firestore/Auth |
+| Acceso a datos | `shared/firestore.ts` | Cliente REST de Firestore con la misma forma que firebase-admin (transacciones con reintento, `increment`, `serverTimestamp`) |
 | Autorización | `auth/context.ts` | Resolver membresía activa y rol desde Firestore; `requirePerm` |
 | Servicios de dominio | `spaces/`, `tasks/`, `reminders/`, `contacts/`, `finance/`, `telegram/link.ts` | Reglas de negocio en transacciones |
 | Auditoría | `shared/audit.ts` | Registro en la misma transacción que la operación |
@@ -29,7 +33,7 @@
 
 1. Firebase Auth (correo/contraseña). Primera sesión → `user.bootstrap` crea perfil y espacio personal (idempotente).
 2. `SessionProvider` escucha `users/{uid}` y `collectionGroup('members').where('uid','==',uid)`; el espacio activo se guarda en `localStorage` solo como preferencia: el servidor valida la membresía en cada operación.
-3. Pantallas leen con `onSnapshot`; las acciones llaman `call(op, spaceId, data)` (valida con el mismo contrato antes de enviar). El éxito solo se muestra cuando el servidor confirma.
+3. Pantallas leen con `onSnapshot`; las acciones llaman `call(op, spaceId, data)` → `POST /api` con el ID token (valida con el mismo contrato antes de enviar). El éxito solo se muestra cuando el servidor confirma.
 
 ## Flujo Telegram
 
@@ -57,7 +61,7 @@ La IA nunca accede a Firestore ni ejecuta: solo produce una intención que se va
 ## Recordatorios duraderos
 
 - Estado en `spaces/{s}/reminders/{id}`: `scheduled → sending → delivered | undeliverable | failed`, con `version`, `attempts`, `lockedUntil`.
-- `reminderSweep` (cada minuto) toma vencidos con una transacción (`claim`), envía y guarda el resultado solo si la versión no cambió (`finish`). Reprogramar/cancelar sube la versión e invalida envíos en curso.
+- El Cron Trigger del Worker (cada minuto) toma vencidos con una transacción (`claim`), envía y guarda el resultado solo si la versión no cambió (`finish`). Reprogramar/cancelar sube la versión e invalida envíos en curso.
 - Fallo de Telegram: reintentos con espera 2ⁿ minutos hasta 5 intentos → `failed`. Sin Telegram vinculado → `undeliverable` (visible en la PWA). Proceso caído → `sending` con plazo vencido se recupera.
 - Entrega **al menos una vez**: si la función muere entre enviar y guardar, puede repetirse un aviso.
 - Recurrencias en hora local con Luxon (respeta cambios de horario y meses cortos con `anchorDay`).
@@ -70,4 +74,4 @@ La IA nunca accede a Firestore ni ejecuta: solo produce una intención que se va
 | PWA / cliente | Ninguna | Contrato Zod + membresía/rol en servidor; `spaceId` solo selecciona |
 | Telegram | Autenticidad por secreto del webhook | Identidad por vínculo `telegramLinks/{chatId}`, nunca por username |
 | IA (texto, imágenes) | Ninguna | Salida validada; acciones financieras con confirmación; instrucciones del contenido ignoradas |
-| Admin SDK | Total (salta reglas) | Por eso cada servicio llama `requirePerm` explícitamente |
+| Cuenta de servicio del Worker | Total (salta reglas) | Por eso cada servicio llama `requirePerm` explícitamente |

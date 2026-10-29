@@ -1,13 +1,12 @@
 # Avance de Aguiteks LifeOS
 
-Documento de seguimiento para continuar el trabajo entre sesiones. Actualizado: 2026-10-28.
+Documento de seguimiento para continuar el trabajo entre sesiones. Actualizado: 2026-10-29.
+Repositorio: `CrisDavid-code/Assistant-Telegram` (rama `main`).
 
 ## Diagnóstico inicial (Fase 0)
-- Repositorio **vacío** (sin commits). No había app de Lovable ni código previo que conservar.
-- Se tomó como base el método del skill *app-movil-aguiteks* (stack, plantillas de diseño, lecciones de Chambas GT), con dos desviaciones justificadas:
-  1. **Costo cero sin tarjeta (decisión del 2026-10-28):** Firebase Spark (Hosting, Auth, Firestore) + **Cloudflare Workers Free** para la API, el webhook de Telegram y el Cron de recordatorios. Es el mismo patrón del Worker push gratuito del skill. Se descartó Blaze (exige tarjeta y puede cobrar).
-  2. **Escrituras solo por backend** (el skill valida en reglas): una sola implementación de negocio para PWA, Telegram e IA.
-- Firebase Web SDK 13 (compatible con `@firebase/rules-unit-testing` 6).
+- Repositorio vacío al empezar. Se tomó como base el método del skill *app-movil-aguiteks* (stack, diseño, lecciones de Chambas GT).
+- **Costo cero sin tarjeta (decisión del 2026-10-28):** Firebase Spark (Hosting, Auth, Firestore) + **Cloudflare Workers Free** (API, webhook de Telegram, Cron, Workers AI). Se descartó Blaze (exige tarjeta y puede cobrar).
+- Escrituras solo por backend: una sola implementación de negocio para PWA, Telegram e IA.
 
 ## Decisiones de arquitectura
 | Decisión | Motivo |
@@ -15,52 +14,54 @@ Documento de seguimiento para continuar el trabajo entre sesiones. Actualizado: 
 | `POST /api` del Worker + `runOp` | Mismo contrato, autorización e idempotencia para todos los canales |
 | `requestId` del cliente = id del documento | Idempotencia sin colección extra |
 | Recordatorios por Cron Trigger cada minuto | Duradero, gratis; estado en Firestore |
-| Cliente REST propio de Firestore (`worker/src/shared/firestore.ts`) | `firebase-admin` no corre en Workers; misma interfaz → los servicios no cambiaron |
-| Reglas en español antes que IA | Sin costo ni latencia para frases comunes; IA opcional |
+| Cliente REST propio de Firestore | `firebase-admin` no corre en Workers; misma interfaz → los servicios no cambiaron |
+| Documentos en Firestore (≤ 700 KB, base64) | Cloud Storage exige facturación y Cloudflare R2 exige registrar un medio de pago |
+| Voz con Workers AI (Whisper) | Incluido en el plan gratuito de Cloudflare; sin otra cuenta |
+| Reglas en español antes que IA | Sin costo ni latencia para frases comunes; Claude opcional |
 | Caché de Firestore en memoria en la PWA | No guardar finanzas en el dispositivo |
-| Sin TanStack Query / React Hook Form | `onSnapshot` ya da tiempo real; formularios nativos + contratos Zod bastan. Agregar si los formularios crecen |
 | Una entidad `obligations` para facturas, deudas, cobros y suscripciones | Misma lógica de pagos parciales y estados |
+| Metas de ahorro como apartados (sin mover saldos) | Evita descuadrar o duplicar movimientos |
+| Administradores por `ADMIN_UIDS` | Sin custom claims ni Admin SDK |
 
 ## Estado por fase
-Leyenda: ✅ implementado y probado · 🔑 implementado, falta credencial · 🟡 parcial · ⏳ pendiente
+Leyenda: ✅ implementado y probado · 🔑 implementado, falta credencial o cuenta · 🟡 parcial
 
 | Fase | Estado | Detalle |
 |---|---|---|
 | 0. Auditoría y plan | ✅ | Este documento, `architecture.md`, `data-model.md` |
-| 1. Fundamentos y seguridad | ✅ | Usuarios, espacios personal/empresa, membresías e invitaciones, 5 roles, reglas Firestore/Storage, auditoría, contratos Zod, pruebas de aislamiento |
-| 2. PWA | ✅ | Navegación móvil/escritorio, selector de espacio, inicio con datos reales, configuración, estados de carga/vacío/error, manifest + SW + iconos, tema, aviso sin conexión. E2E Playwright |
-| 3. Agenda y productividad | ✅ / 🟡 | Tareas (vistas, editar, completar, cancelar), recordatorios únicos y recurrentes con reintentos y recuperación, contactos, actividades con seguimiento. 🟡 Sin vista de calendario mensual; sin tareas recurrentes (solo recordatorios) |
-| 4. Finanzas | ✅ / 🟡 | Cuentas, ingresos, gastos, transferencias (multimoneda), anulación, obligaciones con pagos parciales, presupuestos, resumen por moneda, conciliación. 🟡 Metas de ahorro pendientes |
-| 5. Telegram | ✅ 🔑 | Webhook en el Worker con secreto e idempotencia, vinculación segura, 15 comandos, lenguaje natural, confirmaciones, selección de espacio, contactos compartidos. Falta crear el bot y registrar el webhook |
-| 6. IA | 🟡 🔑 | Intérprete por reglas ✅; Claude para texto e imágenes implementado (falta `ANTHROPIC_API_KEY`); cuota mensual ✅. ⏳ Transcripción de voz (necesita proveedor); ⏳ registro de tokens |
-| 7. Proyectos, CRM, documentos | ⏳ | Pendiente: proyectos, oportunidades/etapas, documentos con Storage y vencimientos. Base lista: contactos, actividades, obligaciones `expected` |
-| 8. SaaS y observabilidad | 🟡 | Planes y cuotas en backend ✅ (espacios de empresa, mensajes al asistente). ⏳ Panel de administración, métricas de consumo, alertas operativas |
-| 9. Producción | 🟡 | CI ✅, despliegue/reversión/runbooks documentados ✅. ⏳ Exportación y eliminación de cuenta automatizadas, verificación de correo, App Check, limpieza de códigos vencidos |
+| 1. Fundamentos y seguridad | ✅ | Usuarios, espacios personal/empresa, membresías e invitaciones, 5 roles, reglas, auditoría, contratos Zod, pruebas de aislamiento |
+| 2. PWA | ✅ | Navegación móvil (barra + «Más») y escritorio, selector de espacio, inicio con datos reales, estados de carga/vacío/error, PWA instalable, tema, aviso sin conexión |
+| 3. Agenda y productividad | ✅ | Tareas con vistas y **calendario mensual**, **tareas recurrentes**, recordatorios únicos y recurrentes con reintentos y recuperación, contactos, actividades con seguimiento |
+| 4. Finanzas | ✅ | Cuentas, ingresos, gastos, transferencias multimoneda, anulación, obligaciones con pagos parciales, presupuestos, resumen por moneda, conciliación, **metas de ahorro** |
+| 5. Telegram | ✅ 🔑 | Webhook con secreto e idempotencia, vinculación segura, 15 comandos, lenguaje natural, confirmaciones, selección de espacio, contactos compartidos. Falta crear el bot |
+| 6. IA | ✅ 🔑 | Intérprete por reglas; Claude para texto e imágenes (falta `ANTHROPIC_API_KEY`); **voz con Workers AI** (activa al desplegar); cuota mensual y **registro de tokens** por espacio |
+| 7. Proyectos, CRM, documentos | ✅ | **Proyectos** con avance real; **oportunidades** por etapas con cobro esperado al ganar; **documentos** con archivo validado, descarga autorizada y aviso de vencimiento |
+| 8. SaaS y observabilidad | ✅ | Planes y cuotas en backend; **uso del plan** en Configuración; **panel de administración** (métricas y cambio de plan); **alertas** al administrador por Telegram |
+| 9. Producción | ✅ / 🟡 | CI; **exportar y eliminar cuenta**; **verificación de correo** (exigida para invitar); **limpieza** de códigos vencidos; **respaldo/restauración** (`scripts/backup.mjs`); despliegue, reversión y runbooks. 🟡 App Check no incluido (requiere reCAPTCHA; opcional) |
 
 ## Pruebas (resultados reales de la última ejecución)
 | Suite | Comando | Resultado |
 |---|---|---|
 | Unitarias (dinero, permisos, fechas, intérprete, zonas horarias) | `npm test` | 19/19 ✅ |
-| Integración contra emuladores (seguridad, finanzas, recordatorios, Telegram, IA simulada, reglas) | `npm run test:emu` | 52/52 ✅ (con el cliente REST) |
-| E2E PWA → Worker en `wrangler dev` (runtime `workerd`) → emuladores | `node tests/e2e/pwa.cjs` | 9/9 pasos ✅, sin errores de consola |
-| Worker en `workerd`: webhook (401 sin secreto, 200, repetido ignorado) y Cron (recordatorio vencido → `undeliverable`) | manual con `curl` | ✅ |
-| Typecheck + build | `npm run typecheck && npm run build` | ✅ |
+| Integración contra emuladores (seguridad, finanzas, recordatorios, Telegram, IA simulada, reglas, módulos nuevos) | `npm run test:emu` | 67/67 ✅ |
+| E2E: PWA → Worker en `workerd` → emuladores (registro, tareas, finanzas, asistente, proyectos, documentos, oportunidades, metas, calendario, Telegram, exportar, eliminar cuenta) | `node tests/e2e/pwa.cjs` | 16/16 pasos ✅, sin errores de consola |
+| Respaldo y restauración (incluye documentos sin padre) | `scripts/backup.mjs` contra emulador | ✅ |
+| Typecheck + build (PWA y Worker de 395 KB comprimido) | `npm run typecheck && npm run build` | ✅ |
 
-Errores encontrados y corregidos gracias a las pruebas: `\b` de JavaScript no reconoce letras acentuadas («gasté»); días terminados en «s»; campos `undefined` en Firestore; carrera entre registro y creación del perfil (nombre vacío); el SDK *callable* convierte `undefined` en `null`; la lectura transaccional `GET ?transaction=` se bloquea en el emulador (se usa `batchGet`, como los SDK oficiales).
+Errores encontrados y corregidos gracias a las pruebas: `\b` no reconoce acentos; días terminados en «s»; campos `undefined`; carrera de registro; `undefined→null` del SDK callable; `GET ?transaction=` bloqueado en el emulador (se usa `batchGet`); archivo excluido por un `.gitignore` demasiado amplio; agregaciones combinadas que excluyen documentos sin uno de los campos (se separan); borrado redundante del usuario en el navegador.
 
 ## Bloqueos que requieren intervención humana
-1. **Proyecto de Firebase (Spark, gratis)**, su configuración web y una clave de cuenta de servicio; **cuenta de Cloudflare** (gratis) → `docs/deployment.md`.
-2. **Bot de Telegram** en @BotFather y secretos `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` → `docs/telegram-setup.md`.
-3. **Clave de IA** (`ANTHROPIC_API_KEY`) si se quiere IA para frases complejas e imágenes.
-4. **Proveedor de transcripción de voz** (decisión de producto: cuál usar).
-5. **Proveedor de pagos** para cobrar planes (no se simula ningún cobro).
+1. **Proyecto de Firebase (Spark)**, su configuración web y una clave de cuenta de servicio; **cuenta de Cloudflare** → `docs/deployment.md`.
+2. **Bot de Telegram** en @BotFather → `docs/telegram-setup.md`.
+3. Opcional: **clave de Anthropic** para frases complejas e imágenes (pago por uso).
+4. **Proveedor de pagos** para cobrar planes (no se simula ningún cobro).
+5. Autorización explícita para desplegar a producción.
 
 ## Riesgos del plan gratuito (verificar en producción)
-- Límite de 10 ms de CPU por solicitud en Workers Free: medir con `wrangler tail` (la firma RS256 se reutiliza por 1 h; las verificaciones de JWT usan claves en caché).
-- Cuotas diarias de Firestore Spark: el barrido gasta ~3 mil lecturas/día de 50 mil.
-- Sin respaldos administrados en Spark: falta script de respaldo JSON (Fase 9).
-- Documentos (Fase 7): usar Cloudflare R2 gratis en vez de Cloud Storage (exige facturación).
-6. Autorización explícita para desplegar a producción.
+- Límite de 10 ms de CPU por solicitud en Workers Free: medir con `wrangler tail`.
+- Cuotas diarias de Firestore Spark (~3 mil lecturas/día del barrido de recordatorios, de 50 mil).
+- Asignación diaria gratuita de Workers AI para notas de voz.
+- Archivos de hasta 700 KB por documento.
 
-## Siguiente paso recomendado
-Fase 7 (proyectos y documentos con Storage privado), luego metas de ahorro, exportación/eliminación de cuenta y panel de administración.
+## Mejoras posibles (fuera del plan)
+App Check; comandos de Telegram para proyectos y documentos; archivos grandes fragmentados; cobro de planes con un proveedor de pagos.

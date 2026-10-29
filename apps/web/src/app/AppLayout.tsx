@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Bot, CalendarCheck, Home, Settings, Users, Wallet, WifiOff } from 'lucide-react';
+import { Bot, CalendarCheck, FileText, FolderKanban, Grid2x2, Handshake, Home, Settings, Users, Wallet, WifiOff } from 'lucide-react';
 import { useSession } from '../hooks/session';
 
 function useOnline() {
@@ -25,7 +25,15 @@ export function AppLayout() {
     { to: '/agenda', label: 'Agenda', icon: CalendarCheck },
     ...(s.can('finance.read') ? [{ to: '/finanzas', label: 'Finanzas', icon: Wallet }] : []),
     { to: '/contactos', label: 'Contactos', icon: Users },
+    { to: '/oportunidades', label: 'Oportunidades', icon: Handshake },
+    { to: '/proyectos', label: 'Proyectos', icon: FolderKanban },
+    { to: '/documentos', label: 'Documentos', icon: FileText },
     { to: '/asistente', label: 'Asistente', icon: Bot },
+  ];
+  // Teléfono: máximo 5 destinos de igual ancho; el resto vive en «Más».
+  const mobile = [
+    items[0]!, items[1]!, ...(s.can('finance.read') ? [items[2]!] : []),
+    items.find((i) => i.to === '/asistente')!, { to: '/mas', label: 'Más', icon: Grid2x2, end: false },
   ];
   const link = ({ isActive }: { isActive: boolean }) => (isActive ? 'text-brand-700' : 'text-ink-soft');
 
@@ -70,7 +78,7 @@ export function AppLayout() {
       </div>
 
       <nav aria-label="Principal" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
-        {items.map(({ to, label, icon: Icon, end }) => (
+        {mobile.map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} className={(a) => `flex min-h-14 min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${link(a)}`}>
             <Icon className="size-5" aria-hidden />{label}
           </NavLink>

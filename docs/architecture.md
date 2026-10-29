@@ -3,12 +3,14 @@
 ## Componentes
 
 ```
- PWA (React)  ──lectura en tiempo real──▶  Firestore  ◀──Admin SDK──┐
+ PWA (React)  ──lectura en tiempo real──▶  Firestore  ◀──REST (cuenta de servicio)──┐
      │                (reglas: solo lectura por rol)                  │
      └──fetch POST /api (ID token de Firebase)──▶ Cloudflare Worker ─┐
                                                                      ├─▶ runOp() ─▶ servicios ─▶ Firestore (REST)
  Telegram ──webhook HTTPS (secreto)──▶ Worker POST /telegram ────────┘    (transacción + auditoría)
- Cron Trigger (cada minuto) ──▶ Worker scheduled() ──▶ entrega de recordatorios ──▶ Bot API
+ Cron Trigger (cada minuto) ──▶ Worker scheduled() ──▶ recordatorios ──▶ Bot API
+                         (cada 15 min) ──▶ limpieza de códigos + alertas al administrador
+ Notas de voz ──▶ Workers AI (Whisper, gratis) ──▶ mismo flujo del asistente
 
  Costo: Firebase Spark (Hosting, Auth, Firestore) + Cloudflare Workers Free = $0
 ```
@@ -27,6 +29,7 @@
 | Servicios de dominio | `spaces/`, `tasks/`, `reminders/`, `contacts/`, `finance/`, `telegram/link.ts` | Reglas de negocio en transacciones |
 | Auditoría | `shared/audit.ts` | Registro en la misma transacción que la operación |
 | Integraciones | `telegram/api.ts`, `ai/claude.ts` | Clientes externos reemplazables en pruebas |
+| Módulos de dominio | `projects/`, `crm/`, `documents/`, `finance/goals.ts`, `account/`, `admin/` | Proyectos, oportunidades, documentos, metas, exportar/eliminar cuenta, métricas y mantenimiento |
 | Cuotas | `subscriptions/quota.ts` | Límites por plan aplicados antes de ejecutar |
 
 ## Flujo PWA

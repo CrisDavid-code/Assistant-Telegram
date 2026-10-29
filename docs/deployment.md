@@ -26,7 +26,7 @@ npx firebase use --add        # elige el proyecto y un alias (dev/prod)
 cd worker
 npx wrangler login
 ```
-Completar `[vars]` en `worker/wrangler.toml`: `FIREBASE_PROJECT_ID`, `ALLOWED_ORIGINS` (URL de la PWA), `TELEGRAM_BOT_USERNAME`, `APP_URL`.
+Completar `[vars]` en `worker/wrangler.toml`: `FIREBASE_PROJECT_ID`, `ALLOWED_ORIGINS` (URL de la PWA), `TELEGRAM_BOT_USERNAME`, `APP_URL`, y opcionalmente `ADMIN_UIDS` (tu uid, visible en Firebase → Authentication) y `ADMIN_TELEGRAM_CHAT_ID` (alertas). El binding `[ai]` (voz) ya está configurado y es gratuito.
 
 ## 3. Secretos del Worker (nunca en el repositorio)
 ```bash
@@ -62,7 +62,7 @@ Después: registrar el webhook (`scripts/telegram-setup.mjs`, ver `docs/telegram
 - Datos: no hay migraciones destructivas; los cambios de esquema son aditivos.
 
 ## 8. Copias de seguridad en Spark
-Las exportaciones administradas y PITR de Firestore requieren facturación. Alternativa gratuita: script con la cuenta de servicio que lea las colecciones por REST y las guarde como JSON (pendiente, Fase 9). Mientras tanto, exportar manualmente desde la consola cuando haya datos importantes.
+Las exportaciones administradas y PITR requieren facturación. Usa `scripts/backup.mjs` (ver `docs/runbooks.md`): respaldo y restauración completos por REST con la cuenta de servicio.
 
 ## Límites y riesgos del plan gratuito
 | Límite | Consumo estimado | Qué pasa si se supera |
@@ -70,6 +70,8 @@ Las exportaciones administradas y PITR de Firestore requieren facturación. Alte
 | Firestore 50 mil lecturas/día | Barrido de recordatorios ≈ 3 mil/día + uso normal | Firestore rechaza operaciones hasta el día siguiente (no cobra) |
 | Workers 100 mil solicitudes/día | Cron 1,440/día + mensajes + API | Errores 429 hasta el día siguiente (no cobra) |
 | Workers 10 ms de CPU por solicitud | Casi todo es espera de red; la firma RS256 se reutiliza 1 h | Solicitudes interrumpidas. Medir con `wrangler tail` en pruebas reales |
-| Paquete del Worker ≤ 3 MB comprimido | 389 KB | No despliega |
+| Paquete del Worker ≤ 3 MB comprimido | 395 KB | No despliega |
+| Workers AI (voz) | Asignación diaria gratuita | Las notas de voz fallan hasta el día siguiente; el bot pide escribir |
+| Documentos | ≤ 700 KB por archivo; Firestore 1 GiB total | Se rechaza el archivo con un mensaje claro |
 
 En ningún caso hay cobro: al superar un límite el servicio se detiene hasta que se renueva la cuota. La IA de Anthropic (opcional) sí es de pago por uso.

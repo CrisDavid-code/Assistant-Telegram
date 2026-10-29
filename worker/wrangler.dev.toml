@@ -1,0 +1,9 @@
+# Desarrollo local contra los emuladores (sin cuenta de Cloudflare): igual que wrangler.toml pero sin
+# Workers AI, que solo funciona remoto. Las variables locales van en .dev.vars.
+name = "aguiteks-lifeos-dev"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = ["* * * * *"]

@@ -26,8 +26,13 @@ Ejecutar la conciliación `recomputeBalance(ctx, accountId)` (`worker/src/financ
 - Cuenta: deshabilitar el usuario en Firebase Auth (consola) — el Worker rechaza sus tokens al vencer (máx. 1 hora); para efecto inmediato, también quitar sus membresías.
 
 ## Restaurar información
-- En plan Spark no hay PITR ni exportaciones administradas (requieren facturación). Restaurar desde los respaldos JSON (script pendiente, Fase 9) o reconstruir con la auditoría.
+- Respaldo (semanal recomendado): `FIREBASE_SERVICE_ACCOUNT="$(cat clave.json)" node scripts/backup.mjs respaldo.jsonl` y guardar el archivo cifrado.
+- Restaurar: `node scripts/backup.mjs --restore respaldo.jsonl` (sobrescribe documentos con el mismo nombre; probar antes en un proyecto de prueba).
 - Si se activa facturación en el futuro: PITR (`gcloud firestore databases restore`) y exportaciones a un bucket.
+
+## Alertas operativas
+- Configura `ADMIN_TELEGRAM_CHAT_ID` (tu chat con el bot) en `wrangler.toml`: cada 15 min se avisa si hay recordatorios fallidos nuevos.
+- Panel: PWA → Configuración → «Administración de la plataforma» (requiere tu uid en `ADMIN_UIDS`).
 
 ## Incidentes
 1. Contener: desactivar el webhook (`deleteWebhook`) o el Worker (`npx wrangler rollback` o pausar la ruta en el panel); si hay fuga de datos, revocar sesiones (Auth → deshabilitar usuarios afectados).
@@ -35,6 +40,5 @@ Ejecutar la conciliación `recomputeBalance(ctx, accountId)` (`worker/src/financ
 3. Corregir con prueba que reproduzca el problema; desplegar siguiendo `docs/deployment.md`.
 4. Comunicar a los usuarios afectados y documentar el incidente.
 
-## Solicitudes de exportación/eliminación (manual hasta Fase 9)
-- Exportar: espacios donde el usuario es propietario + su perfil, con un script que use la cuenta de servicio.
-- Eliminar: quitar membresías, borrar espacio personal y perfil, desvincular Telegram, borrar usuario de Auth. Las copias de seguridad expiran según su política de retención; informarlo al usuario.
+## Solicitudes de exportación/eliminación
+La persona lo hace sola en Configuración → Mis datos. Si pide ayuda: verificar identidad, indicarle el flujo y, tras eliminar, borrar sus datos de los respaldos JSON guardados.

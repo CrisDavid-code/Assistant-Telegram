@@ -1,6 +1,6 @@
 # Aguiteks LifeOS
 
-Plataforma SaaS **de costo cero** para organizar la vida personal y laboral: tareas, recordatorios, finanzas, contactos y espacios de empresa, desde una **PWA** instalable y un **bot de Telegram** que comparten los mismos servicios de backend y los mismos datos.
+Plataforma SaaS **de costo cero** para organizar la vida personal y laboral: tareas, recordatorios, calendario, finanzas, metas, contactos, CRM, proyectos, documentos y espacios de empresa, desde una **PWA** instalable y un **bot de Telegram** que comparten los mismos servicios de backend y los mismos datos.
 
 > Estado de cada fase, pruebas y pendientes: **[docs/PROGRESS.md](docs/PROGRESS.md)**.
 
@@ -48,6 +48,7 @@ cp apps/web/.env.example apps/web/.env.local
 npm run dev:web                            # http://localhost:5173
 ```
 
+`npm run dev:worker` usa `worker/wrangler.dev.toml` (sin Workers AI, que solo funciona remoto: la voz responde «no configurada»).
 Para disparar el barrido de recordatorios a mano: `curl 'http://127.0.0.1:8787/cdn-cgi/local/scheduled?cron=*+*+*+*+*'`.
 
 ## Pruebas
@@ -55,7 +56,7 @@ Para disparar el barrido de recordatorios a mano: `curl 'http://127.0.0.1:8787/c
 ```bash
 npm run typecheck      # TypeScript estricto en los tres paquetes
 npm test               # unitarias: dinero, permisos, fechas en español, intérprete, zonas horarias
-npm run test:emu       # integración contra emuladores (52 pruebas)
+npm run test:emu       # integración contra emuladores (67 pruebas)
 npm run build          # PWA + paquete del Worker
 # E2E de la PWA (emuladores, `npm run dev:worker` y `npm run dev:web` corriendo):
 node tests/e2e/pwa.cjs /tmp

@@ -17,8 +17,16 @@ Tipos exactos en `packages/contracts/src/entities.ts`. Todos los documentos los 
 | `spaces/{sid}/transactions/{id}` | `kind(income/expense/transfer), status(posted/voided), amount, currency, accountId, toAccountId, toAmount, toCurrency, category, description, date, occurredAt, obligationId, voidReason` | owner/admin/supervisor |
 | `spaces/{sid}/obligations/{id}` | `direction(payable/receivable), kind, title, counterparty, contactId, amount, paid, currency, dueDate, dueAt, status(open/partial/settled/cancelled), reminderId` | owner/admin/supervisor |
 | `spaces/{sid}/budgets/{categoria}` | `category, limit, currency` (mensual) | owner/admin/supervisor |
+| `spaces/{sid}/projects/{id}` | `name, description, status(active/paused/done/cancelled), dueDate, budget, currency, contactId` | Miembros activos |
+| `spaces/{sid}/opportunities/{id}` | `title, contactId, stage(lead→won/lost), amount, currency, expectedClose, nextAction, notes, obligationId, closedAt` | Miembros activos |
+| `spaces/{sid}/documents/{id}` | `title, type, issuer, issuedAt, expiresAt, tags, contactId, file{name,mime,size}, reminderId` | Miembros activos |
+| `spaces/{sid}/documentFiles/{id}` | `data` (base64 ≤ 700 KB), `mime` | Nadie (solo por la API) |
+| `spaces/{sid}/goals/{id}` | `name, target, saved, currency, targetDate, status(active/reached/archived)` | owner/admin/supervisor |
+| `spaces/{sid}/goalContributions/{id}` | `goalId, amount (±), note` | owner/admin/supervisor |
 | `spaces/{sid}/audit/{id}` | `actorId, source, op, target, details, result, at` | owner/admin |
-| `spaces/{sid}/usage/{AAAA-MM}` | contadores de cuota (`assistantPerMonth`) | owner/admin |
+| `spaces/{sid}/usage/{AAAA-MM}` | `month, assistantPerMonth, aiInputTokens, aiOutputTokens` | owner/admin |
+| `deletedAccounts/{uid}` | fecha y número de espacios borrados (sin datos personales) | Nadie |
+| `system/alerts` | última revisión de alertas operativas | Nadie |
 | `telegramLinks/{chatId}` | `uid, username, linkedAt` | Nadie (backend) |
 | `telegramLinkCodes/{sha256(código)}` | `uid, expiresAt, usedAt` | Nadie |
 | `telegramUpdates/{update_id}` | marca de idempotencia, `expireAt` (TTL 7 días) | Nadie |
@@ -33,6 +41,9 @@ Tipos exactos en `packages/contracts/src/entities.ts`. Todos los documentos los 
 - **Anulación:** `status: voided` + motivo; revierte saldos y lo pagado de la obligación. No hay borrado de movimientos.
 - **Obligaciones:** crear una obligación no mueve dinero. `obligation.pay` crea el movimiento (gasto si `payable`, ingreso si `receivable`) y suma `paid` en la misma transacción; no se permite sobrepago. Estados: `open → partial → settled`, o `cancelled`.
 - **Idempotencia:** el `requestId` del cliente es el id del documento; repetirlo devuelve `duplicate: true` sin efectos.
+- **Tareas recurrentes:** al completar una, se crea la siguiente con id determinista (`{id}_{AAAAMMDD}`): completar dos veces no duplica.
+- **Oportunidad ganada:** puede crear un cobro esperado (`obligations/opp_{id}`); nunca un ingreso.
+- **Documentos:** el tipo real se valida por los primeros bytes (PDF, JPG, PNG, WEBP), no por el nombre.
 - **Fechas:** instantes absolutos (`Timestamp`) + fecha/hora local y zona del espacio cuando importa para programar. Movimientos con solo fecha → `occurredAt` a mediodía local.
 
 ## Índices

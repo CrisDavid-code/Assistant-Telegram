@@ -52,5 +52,10 @@
 - Datos personales y financieros separados por espacio; el espacio personal nunca se comparte.
 - PWA: caché de Firestore en memoria (no se guardan finanzas en el dispositivo); el service worker solo guarda archivos de la app.
 - Imágenes y voz de Telegram no se guardan.
-- **Pendiente (Fase 9):** exportación de datos del usuario, solicitud de eliminación de cuenta, limpieza de códigos vencidos. La eliminación no puede ser instantánea en copias de seguridad (ver runbooks).
-- **Pendiente:** verificación de correo obligatoria y App Check.
+- **Exportación:** Configuración → Mis datos → «Exportar mis datos» (JSON de los espacios propios; archivos como metadatos).
+- **Eliminación de cuenta:** exige escribir ELIMINAR; bloquea si la persona es dueña de una empresa con otros miembros; borra sus espacios, sale de los ajenos, revoca Telegram y elimina el usuario de Auth. Queda solo `deletedAccounts/{uid}` sin datos personales. Los respaldos JSON existentes deben borrarse aparte.
+- **Verificación de correo:** se envía al registrarse; es obligatoria para invitar personas.
+- **Documentos:** solo PDF/JPG/PNG/WEBP verificados por bytes, ≤ 700 KB; el contenido no es legible directo desde el cliente.
+- **Administración:** `ADMIN_UIDS` en el Worker; el backend lo verifica en cada operación de administración.
+- Limpieza automática de códigos de vinculación vencidos (cada 15 min).
+- **No incluido:** App Check (opcional; requiere reCAPTCHA).

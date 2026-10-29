@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { signOut, sendPasswordResetEmail } from 'firebase/auth';
+import { sendEmailVerification, signOut, sendPasswordResetEmail } from 'firebase/auth';
+import { Link } from 'react-router-dom';
 import { collection, query, where } from 'firebase/firestore';
 import { LogOut, Send } from 'lucide-react';
 import { ASSIGNABLE_ROLES, CURRENCY_CODES, ROLE_LABELS, type MemberDoc } from '@lifeos/contracts';
@@ -174,6 +175,62 @@ function Appearance() {
   );
 }
 
+function Usage() {
+  const { spaceId } = useSpace();
+  const [u, setU] = useState<{ month: string; planLabel: string; assistant: { used: number; limit: number }; aiTokens: { input: number; output: number } } | null>(null);
+  const [err, setErr] = useState<unknown>(null);
+  useEffect(() => {
+    setU(null);
+    call('usage.get', spaceId, {}).then(setU, setErr);
+  }, [spaceId]);
+  if (err) return <Card title="Plan y uso"><ErrorBox error={err} /></Card>;
+  if (!u) return null;
+  const pct = Math.min(100, Math.round((u.assistant.used / u.assistant.limit) * 100));
+  return (
+    <Card title="Plan y uso">
+      <p className="text-sm">Plan: <b>{u.planLabel}</b></p>
+      <p className="mt-2 text-sm">Mensajes al asistente en {u.month}: {u.assistant.used} de {u.assistant.limit}</p>
+      <div className="mt-1 h-2 rounded-full bg-paper" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div className={`h-2 rounded-full ${pct >= 90 ? 'bg-danger-700' : 'bg-brand-600'}`} style={{ width: `${pct}%` }} /></div>
+    </Card>
+  );
+}
+
+function AccountData() {
+  const { user } = useSpace();
+  const [confirmText, setConfirmText] = useState('');
+  const { busy, error, run } = useAction();
+  async function exportData() {
+    await run(async () => {
+      const data = await call('account.export', undefined, {});
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `aguiteks-lifeos-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    }, 'Exportación descargada');
+  }
+  async function remove() {
+    const ok = await run(() => call('account.delete', undefined, { confirm: confirmText as 'ELIMINAR' }));
+    if (ok) await signOut(auth); // el servidor ya borró el usuario; solo se cierra la sesión local
+  }
+  return (
+    <Card title="Mis datos">
+      <p className="text-sm text-ink-soft">Descarga una copia de todo lo que guardas en tus espacios (JSON). Los archivos de documentos se descargan uno a uno.</p>
+      <Button variant="secondary" className="mt-2" busy={busy} onClick={exportData}>Exportar mis datos</Button>
+      <details className="mt-4">
+        <summary className="cursor-pointer text-sm font-semibold text-danger-700">Eliminar mi cuenta</summary>
+        <div className="mt-2 space-y-2 text-sm">
+          <p>Se borran tu perfil, tu espacio personal y los espacios de empresa donde eres la única persona; sales de los demás y se desvincula Telegram. No se puede deshacer. Las copias de seguridad que existan expiran según su política.</p>
+          <Field label="Escribe ELIMINAR para confirmar"><input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className={inputCls} autoComplete="off" /></Field>
+          <Button variant="danger" busy={busy} disabled={confirmText !== 'ELIMINAR'} onClick={remove}>Eliminar mi cuenta definitivamente</Button>
+        </div>
+      </details>
+      {error ? <div className="mt-3"><ErrorBox error={error} /></div> : null}
+    </Card>
+  );
+}
+
 export default function Settings() {
   const { profile, user } = useSpace();
   const { run } = useAction();
@@ -183,6 +240,12 @@ export default function Settings() {
       <Card title="Mi cuenta">
         <p className="font-medium">{profile?.displayName}</p>
         <p className="mb-3 text-sm text-ink-soft">{user?.email}</p>
+        {user && !user.emailVerified && (
+          <p className="mb-3 rounded-xl bg-warn-50 p-3 text-sm text-warn-700">
+            Tu correo no está verificado (necesario para invitar personas).{' '}
+            <button className="font-semibold underline" onClick={() => run(() => sendEmailVerification(user), 'Te enviamos el correo de verificación. Al confirmarlo, cierra sesión y vuelve a entrar.')}>Enviar verificación</button>
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => run(() => sendPasswordResetEmail(auth, user!.email!), 'Te enviamos un correo para cambiar la contraseña')}>Cambiar contraseña</Button>
           <Button variant="secondary" onClick={() => signOut(auth)}><LogOut className="size-4" />Cerrar sesión</Button>
@@ -191,8 +254,11 @@ export default function Settings() {
       <Telegram />
       <SpaceSettings />
       <Members />
+      <Usage />
       <MySpaces />
       <Appearance />
+      <AccountData />
+      <p className="text-center text-xs"><Link to="/admin" className="text-ink-soft underline">Administración de la plataforma (solo administradores)</Link></p>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { collection, limit, orderBy, query, where } from 'firebase/firestore';
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Ban, Plus, Trash2 } from 'lucide-react';
 import {
   ACCOUNT_TYPES, categoryLabel, CURRENCY_CODES, EXPENSE_CATEGORIES, INCOME_CATEGORIES, OBLIGATION_KINDS, parseAmount,
-  type AccountDoc, type BudgetDoc, type Currency, type FinanceSummary, type ObligationDoc, type TransactionDoc,
+  type AccountDoc, type BudgetDoc, type GoalDoc, type Currency, type FinanceSummary, type ObligationDoc, type TransactionDoc,
 } from '@lifeos/contracts';
 import { db } from '../services/firebase';
 import { call, newId } from '../services/api';
@@ -13,7 +13,7 @@ import { useQueryLive } from '../hooks/useLive';
 import { Badge, Button, Card, Empty, ErrorBox, Field, FormFooter, inputCls, Loading, Modal, PageHeader, Tabs, useAction } from '../components/ui';
 import { dayLabel, money, todayIn } from '../lib/format';
 
-type Tab = 'resumen' | 'movimientos' | 'cuentas' | 'pagos' | 'presupuestos';
+type Tab = 'resumen' | 'movimientos' | 'cuentas' | 'pagos' | 'metas';
 type Account = AccountDoc & { id: string };
 const ACCOUNT_LABEL: Record<string, string> = { cash: 'Efectivo', bank: 'Cuenta bancaria', wallet: 'Billetera digital', credit: 'Tarjeta de crédito', other: 'Otra' };
 const KIND_LABEL: Record<string, string> = { bill: 'Factura / servicio', debt: 'Deuda / préstamo', expected: 'Cobro esperado', subscription: 'Suscripción' };
@@ -375,6 +375,79 @@ function Summary() {
   );
 }
 
+function Goals() {
+  const { spaceId, space, can } = useSpace();
+  const [creating, setCreating] = useState(false);
+  const [moving, setMoving] = useState<{ goal: GoalDoc & { id: string }; sign: 1 | -1 } | null>(null);
+  const { busy, error, run, clear } = useAction();
+  const list = useQueryLive<GoalDoc>(() => query(collection(db, 'spaces', spaceId, 'goals'), orderBy('createdAt', 'desc'), limit(100)), `goals:${spaceId}`);
+  const shown = list.data.filter((g) => g.status !== 'archived');
+  async function create(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
+    const cur = f.currency as Currency;
+    if (await run(() => call('goal.create', spaceId, { requestId: newId(), name: f.name!, target: amountOf(f.target!, cur), currency: cur, targetDate: f.targetDate || undefined }), 'Meta creada')) setCreating(false);
+  }
+  async function move(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
+    const g = moving!.goal;
+    if (await run(() => call('goal.contribute', spaceId, { requestId: newId(), goalId: g.id, amount: amountOf(f.amount!, g.currency) * moving!.sign, note: f.note || undefined }), moving!.sign > 0 ? 'Aporte registrado' : 'Retiro registrado')) setMoving(null);
+  }
+  return (
+    <>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-sm text-ink-soft">Apartados para tus objetivos. No mueven el saldo de tus cuentas.</p>
+        {can('finance.write') && <Button onClick={() => setCreating(true)}><Plus className="size-4" />Meta</Button>}
+      </div>
+      {list.loading ? <Loading /> : list.error ? <ErrorBox error={list.error} /> : !shown.length ? <Empty text="Crea una meta: un viaje, un fondo de emergencia, equipo para tu negocio…" /> : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {shown.map((g) => {
+            const pct = Math.min(100, Math.round((g.saved / g.target) * 100));
+            return (
+              <Card key={g.id} title={g.name} action={g.status === 'reached' ? <Badge tone="ok">¡Lograda!</Badge> : undefined}>
+                <p className="text-sm">{money(g.saved, g.currency)} de {money(g.target, g.currency)} <b>({pct}%)</b></p>
+                <div className="my-2 h-2 rounded-full bg-paper" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div className="h-2 rounded-full bg-ok-700" style={{ width: `${pct}%` }} /></div>
+                {g.targetDate && <p className="text-xs text-ink-soft">Fecha objetivo: {dayLabel(g.targetDate, space.timezone)}</p>}
+                {can('finance.write') && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button variant="secondary" onClick={() => setMoving({ goal: g, sign: 1 })}>Aportar</Button>
+                    {g.saved > 0 && <Button variant="ghost" onClick={() => setMoving({ goal: g, sign: -1 })}>Retirar</Button>}
+                    <Button variant="ghost" onClick={() => confirm(`¿Archivar la meta «${g.name}»?`) && run(() => call('goal.archive', spaceId, { goalId: g.id }), 'Meta archivada')}>Archivar</Button>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+      {error && !creating && !moving ? <div className="mt-3"><ErrorBox error={error} /></div> : null}
+      <Modal open={creating} onClose={() => setCreating(false)} title="Nueva meta de ahorro">
+        {creating && (
+          <form onSubmit={create} onChange={clear} className="space-y-3">
+            <Field label="Nombre"><input name="name" required maxLength={80} className={inputCls} autoFocus /></Field>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2"><Field label="Objetivo"><input name="target" required inputMode="decimal" className={inputCls} /></Field></div>
+              <Field label="Moneda"><select name="currency" defaultValue={space.currency} className={inputCls}>{CURRENCY_CODES.map((c) => <option key={c}>{c}</option>)}</select></Field>
+            </div>
+            <Field label="Fecha objetivo"><input name="targetDate" type="date" className={inputCls} /></Field>
+            <FormFooter busy={busy} error={error} onCancel={() => setCreating(false)} />
+          </form>
+        )}
+      </Modal>
+      <Modal open={!!moving} onClose={() => setMoving(null)} title={moving?.sign === -1 ? 'Retirar de la meta' : 'Aportar a la meta'}>
+        {moving && (
+          <form onSubmit={move} onChange={clear} className="space-y-3">
+            <Field label={`Monto (${moving.goal.currency})`}><input name="amount" required inputMode="decimal" className={inputCls} autoFocus /></Field>
+            <Field label="Nota"><input name="note" maxLength={120} className={inputCls} /></Field>
+            <FormFooter busy={busy} error={error} onCancel={() => setMoving(null)} submit="Registrar" />
+          </form>
+        )}
+      </Modal>
+    </>
+  );
+}
+
 export default function Finance() {
   const { can } = useSpace();
   const [params, setParams] = useSearchParams();
@@ -384,11 +457,12 @@ export default function Finance() {
   return (
     <div>
       <PageHeader title="Finanzas" action={can('finance.write') && <Button onClick={() => setParams({ tab, nuevo: 'movimiento' })}><Plus className="size-4" />Movimiento</Button>} />
-      <Tabs value={tab} onChange={(t) => setParams({ tab: t })} options={[['resumen', 'Resumen'], ['movimientos', 'Movimientos'], ['cuentas', 'Cuentas'], ['pagos', 'Pagos y cobros']]} />
+      <Tabs value={tab} onChange={(t) => setParams({ tab: t })} options={[['resumen', 'Resumen'], ['movimientos', 'Movimientos'], ['cuentas', 'Cuentas'], ['pagos', 'Pagos y cobros'], ['metas', 'Metas']]} />
       {tab === 'resumen' && <Summary />}
       {tab === 'movimientos' && <Transactions accounts={accounts.data} />}
       {tab === 'cuentas' && <Accounts accounts={accounts.data} loading={accounts.loading} err={accounts.error} />}
       {tab === 'pagos' && <Obligations accounts={accounts.data} />}
+      {tab === 'metas' && <Goals />}
       <Modal open={creating} onClose={() => setParams({ tab })} title="Nuevo movimiento">
         {creating && <TxForm accounts={accounts.data} onClose={() => setParams({ tab })} />}
       </Modal>

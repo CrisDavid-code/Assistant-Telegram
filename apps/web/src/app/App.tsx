@@ -14,6 +14,11 @@ const Finance = lazy(() => import('../pages/Finance'));
 const Contacts = lazy(() => import('../pages/Contacts'));
 const Assistant = lazy(() => import('../pages/Assistant'));
 const Settings = lazy(() => import('../pages/Settings'));
+const Projects = lazy(() => import('../pages/Projects'));
+const Opportunities = lazy(() => import('../pages/Opportunities'));
+const Documents = lazy(() => import('../pages/Documents'));
+const Admin = lazy(() => import('../pages/Admin'));
+const More = lazy(() => import('../pages/More'));
 
 function Protected({ children }: { children: ReactNode }) {
   const s = useSession();
@@ -51,6 +56,11 @@ export function App() {
                   <Route path="contactos" element={<Contacts />} />
                   <Route path="asistente" element={<Assistant />} />
                   <Route path="configuracion" element={<Settings />} />
+                  <Route path="proyectos" element={<Projects />} />
+                  <Route path="oportunidades" element={<Opportunities />} />
+                  <Route path="documentos" element={<Documents />} />
+                  <Route path="admin" element={<Admin />} />
+                  <Route path="mas" element={<More />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

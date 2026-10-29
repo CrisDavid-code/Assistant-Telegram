@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { collection, limit, orderBy, query, where } from 'firebase/firestore';
-import { Bell, CalendarClock, Check, Pencil, Plus, RotateCcw, X } from 'lucide-react';
-import { TASK_PRIORITIES, type ReminderDoc, type TaskDoc } from '@lifeos/contracts';
+import { Bell, CalendarClock, Check, ChevronLeft, ChevronRight, Pencil, Plus, Repeat, RotateCcw, X } from 'lucide-react';
+import { TASK_PRIORITIES, type ProjectDoc, type ReminderDoc, type TaskDoc } from '@lifeos/contracts';
 import { db } from '../services/firebase';
 import { call, newId } from '../services/api';
 import { useSpace } from '../hooks/session';
@@ -19,7 +19,7 @@ const REM_STATUS: Record<string, [string, 'neutral' | 'ok' | 'warn' | 'danger' |
 };
 
 type Task = TaskDoc & { id: string };
-type View = 'hoy' | 'proximos' | 'atrasadas' | 'sinfecha' | 'completadas' | 'recordatorios';
+type View = 'hoy' | 'proximos' | 'atrasadas' | 'sinfecha' | 'completadas' | 'recordatorios' | 'mes';
 
 export function TaskRow({ task, tz, onEdit }: { task: Task; tz: string; onEdit?: (t: Task) => void }) {
   const { spaceId, can } = useSpace();
@@ -39,6 +39,7 @@ export function TaskRow({ task, tz, onEdit }: { task: Task; tz: string; onEdit?:
           {task.dueDate && <span className={overdue ? 'font-semibold text-danger-700' : ''}>{dayLabel(task.dueDate, tz)}{task.dueTime ? ` · ${task.dueTime}` : ''}{overdue ? ' (atrasada)' : ''}</span>}
           {task.priority !== 'normal' && <Badge tone={PRIORITY[task.priority]![1]}>{PRIORITY[task.priority]![0]}</Badge>}
           {task.tags.map((t) => <Badge key={t}>#{t}</Badge>)}
+          {task.recurrence && <Badge><Repeat className="mr-1 size-3" aria-hidden />Se repite</Badge>}
           {task.source === 'telegram' && <Badge>Telegram</Badge>}
         </div>
         {task.notes && <p className="mt-1 text-sm text-ink-soft">{task.notes}</p>}
@@ -54,16 +55,20 @@ export function TaskRow({ task, tz, onEdit }: { task: Task; tz: string; onEdit?:
   );
 }
 
-function TaskForm({ task, onClose }: { task: Task | null; onClose: () => void }) {
+export function TaskForm({ task, onClose, projectId }: { task: Task | null; onClose: () => void; projectId?: string }) {
   const { spaceId } = useSpace();
+  const projects = useQueryLive<ProjectDoc>(() => (projectId ? null : query(collection(db, 'spaces', spaceId, 'projects'), where('status', '==', 'active'), limit(100))), `tfp:${spaceId}:${projectId}`);
   const { busy, error, run, clear } = useAction();
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
     const tags = f.tags ? f.tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
     const ok = await run(() => task
-      ? call('task.update', spaceId, { taskId: task.id, title: f.title!, notes: f.notes ?? '', dueDate: f.dueDate || null, dueTime: f.dueTime || null, priority: f.priority as never, tags })
-      : call('task.create', spaceId, { requestId: newId(), title: f.title!, notes: f.notes || undefined, dueDate: f.dueDate || undefined, dueTime: f.dueTime || undefined, priority: f.priority as never, tags }),
+      ? call('task.update', spaceId, { taskId: task.id, title: f.title!, notes: f.notes ?? '', dueDate: f.dueDate || null, dueTime: f.dueTime || null, priority: f.priority as never, tags, projectId: projectId ?? (f.projectId || null) })
+      : call('task.create', spaceId, {
+          requestId: newId(), title: f.title!, notes: f.notes || undefined, dueDate: f.dueDate || undefined, dueTime: f.dueTime || undefined, priority: f.priority as never, tags,
+          projectId: projectId ?? (f.projectId || undefined), recurrence: f.freq ? { freq: f.freq as never, interval: 1 } : undefined,
+        }),
     task ? 'Tarea actualizada' : 'Tarea creada');
     if (ok) onClose();
   }
@@ -79,6 +84,22 @@ function TaskForm({ task, onClose }: { task: Task | null; onClose: () => void })
           {TASK_PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY[p]![0]}</option>)}
         </select>
       </Field>
+      {!projectId && projects.data.length > 0 && (
+        <Field label="Proyecto">
+          <select name="projectId" defaultValue={task?.projectId ?? ''} className={inputCls}>
+            <option value="">Sin proyecto</option>
+            {projects.data.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </Field>
+      )}
+      {!task && (
+        <Field label="Repetir" hint="Al completarla se crea la siguiente. Requiere fecha.">
+          <select name="freq" className={inputCls} defaultValue="">
+            <option value="">No repetir</option><option value="daily">Cada día</option><option value="weekly">Cada semana</option>
+            <option value="monthly">Cada mes</option><option value="yearly">Cada año</option>
+          </select>
+        </Field>
+      )}
       <Field label="Etiquetas" hint="Separadas por comas"><input name="tags" defaultValue={task?.tags.join(', ')} className={inputCls} /></Field>
       <Field label="Notas"><textarea name="notes" rows={3} maxLength={4000} defaultValue={task?.notes ?? ''} className={inputCls} /></Field>
       <FormFooter busy={busy} error={error} onCancel={onClose} />
@@ -161,6 +182,64 @@ function Reminders() {
   );
 }
 
+/** Calendario del mes con tareas abiertas y recordatorios programados; al tocar un día se listan. */
+function MonthCalendar({ tasks, onEdit }: { tasks: Task[]; onEdit: (t: Task) => void }) {
+  const { spaceId, space } = useSpace();
+  const tz = space.timezone;
+  const today = todayIn(tz);
+  const [month, setMonth] = useState(today.slice(0, 7));
+  const [selected, setSelected] = useState(today);
+  const reminders = useQueryLive<ReminderDoc>(() => query(collection(db, 'spaces', spaceId, 'reminders'), where('status', '==', 'scheduled'), orderBy('scheduledFor'), limit(300)), `cal:${spaceId}`);
+  const first = new Date(`${month}-01T12:00:00Z`);
+  const days = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  const lead = (first.getUTCDay() + 6) % 7; // semana inicia el lunes
+  const iso = (d: number) => `${month}-${String(d).padStart(2, '0')}`;
+  const remDay = (r: ReminderDoc) => localInput(r.scheduledFor.toDate(), tz).slice(0, 10);
+  const shift = (n: number) => {
+    const d = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + n, 1));
+    setMonth(d.toISOString().slice(0, 7));
+  };
+  const dayTasks = tasks.filter((t) => t.dueDate === selected);
+  const dayRems = reminders.data.filter((r) => remDay(r) === selected);
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <button aria-label="Mes anterior" onClick={() => shift(-1)} className="grid size-11 place-items-center rounded-full hover:bg-paper"><ChevronLeft /></button>
+        <h2 className="font-bold first-letter:uppercase">{new Intl.DateTimeFormat('es-GT', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(first)}</h2>
+        <button aria-label="Mes siguiente" onClick={() => shift(1)} className="grid size-11 place-items-center rounded-full hover:bg-paper"><ChevronRight /></button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-xs" role="grid">
+        {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => <div key={i} className="py-1 font-semibold text-ink-soft">{d}</div>)}
+        {Array.from({ length: lead }, (_, i) => <div key={`e${i}`} />)}
+        {Array.from({ length: days }, (_, i) => {
+          const d = iso(i + 1);
+          const nT = tasks.filter((t) => t.dueDate === d).length;
+          const nR = reminders.data.filter((r) => remDay(r) === d).length;
+          return (
+            <button key={d} onClick={() => setSelected(d)} aria-label={`${i + 1}: ${nT} tareas, ${nR} recordatorios`} aria-pressed={d === selected}
+              className={`flex min-h-12 flex-col items-center justify-start rounded-lg border p-1 ${d === selected ? 'border-brand-600 bg-brand-50' : 'border-line bg-surface'} ${d === today ? 'font-bold text-brand-700' : ''}`}>
+              {i + 1}
+              <span className="mt-0.5 flex gap-0.5">
+                {nT > 0 && <span className={`size-1.5 rounded-full ${d < today ? 'bg-danger-700' : 'bg-brand-600'}`} />}
+                {nR > 0 && <span className="size-1.5 rounded-full bg-warn-700" />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="rounded-[--radius-card] border border-line bg-surface px-4 py-2">
+        <h3 className="py-2 font-semibold">{dayLabel(selected, tz)}</h3>
+        {reminders.error ? <ErrorBox error={reminders.error} /> : null}
+        {!dayTasks.length && !dayRems.length && <p className="pb-3 text-sm text-ink-soft">Nada para este día.</p>}
+        <ul className="divide-y divide-line">
+          {dayRems.map((r) => <li key={r.id} className="flex items-center gap-2 py-2.5 text-sm"><Bell className="size-4 text-warn-700" />{r.title}<span className="ml-auto text-ink-soft">{localInput(r.scheduledFor.toDate(), tz).slice(11)}</span></li>)}
+          {dayTasks.map((t) => <TaskRow key={t.id} task={t} tz={tz} onEdit={onEdit} />)}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 export default function Agenda() {
   const { spaceId, space, can } = useSpace();
   const [params, setParams] = useSearchParams();
@@ -174,7 +253,7 @@ export default function Agenda() {
   const done = useQueryLive<TaskDoc>(() => (view === 'completadas' ? query(col, where('status', '==', 'done'), orderBy('createdAt', 'desc'), limit(50)) : null), `done:${spaceId}:${view}`);
 
   const byDue = (a: Task, b: Task) => `${a.dueDate}${a.dueTime ?? '99'}`.localeCompare(`${b.dueDate}${b.dueTime ?? '99'}`);
-  const views: Record<Exclude<View, 'recordatorios'>, Task[]> = {
+  const views: Record<Exclude<View, 'recordatorios' | 'mes'>, Task[]> = {
     hoy: open.data.filter((t) => t.dueDate && t.dueDate <= today).sort(byDue),
     proximos: open.data.filter((t) => t.dueDate && t.dueDate > today && t.dueDate <= addDays(today, 30)).sort(byDue),
     atrasadas: open.data.filter((t) => t.dueDate && t.dueDate < today).sort(byDue),
@@ -184,7 +263,7 @@ export default function Agenda() {
   const setView = (v: View) => setParams({ vista: v });
   const close = () => setParams(view === 'hoy' ? {} : { vista: view });
   const state = view === 'completadas' ? done : open;
-  const list = view === 'recordatorios' ? [] : views[view];
+  const list = view === 'recordatorios' || view === 'mes' ? [] : views[view];
 
   return (
     <div>
@@ -196,9 +275,9 @@ export default function Agenda() {
       )} />
       <Tabs value={view} onChange={setView} options={[
         ['hoy', `Hoy (${views.hoy.length})`], ['proximos', 'Próximos 30 días'], ['atrasadas', `Atrasadas (${views.atrasadas.length})`],
-        ['sinfecha', 'Sin fecha'], ['completadas', 'Completadas'], ['recordatorios', 'Recordatorios'],
+        ['mes', 'Calendario'], ['sinfecha', 'Sin fecha'], ['completadas', 'Completadas'], ['recordatorios', 'Recordatorios'],
       ]} />
-      {view === 'recordatorios' ? <Reminders /> : state.loading ? <Loading /> : state.error ? <ErrorBox error={state.error} /> : list.length === 0 ? (
+      {view === 'recordatorios' ? <Reminders /> : view === 'mes' ? <MonthCalendar tasks={open.data} onEdit={setEdit} /> : state.loading ? <Loading /> : state.error ? <ErrorBox error={state.error} /> : list.length === 0 ? (
         <Empty icon={<RotateCcw className="size-8" />} text={view === 'hoy' ? 'Nada pendiente para hoy.' : 'No hay tareas en esta vista.'} />
       ) : (
         <ul className="divide-y divide-line rounded-[--radius-card] border border-line bg-surface px-4">

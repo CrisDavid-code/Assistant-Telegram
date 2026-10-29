@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { Button, ErrorBox, Field, inputCls, useAction } from '../components/ui';
 import { bootstrap, registering, useSession } from '../hooks/session';
@@ -27,6 +27,7 @@ export function Login() {
         try {
           const cred = await createUserWithEmailAndPassword(auth, email, password);
           await updateProfile(cred.user, { displayName: name });
+          sendEmailVerification(cred.user).catch(() => undefined); // no bloquea el registro
           await bootstrap(name);
         } finally {
           registering.active = false;

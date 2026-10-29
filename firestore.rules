@@ -30,8 +30,9 @@ service cloud.firestore {
         allow read: if (signedIn() && uid == request.auth.uid) || coreReader(sid);
       }
       match /{col}/{id} {
-        allow read: if (col in ['tasks', 'reminders', 'contacts', 'activities', 'projects'] && coreReader(sid))
-          || (col in ['accounts', 'transactions', 'obligations', 'budgets'] && financeReader(sid))
+        // documentFiles (contenido de archivos) no se lee directo: solo por la API, que verifica permisos.
+        allow read: if (col in ['tasks', 'reminders', 'contacts', 'activities', 'projects', 'opportunities', 'documents'] && coreReader(sid))
+          || (col in ['accounts', 'transactions', 'obligations', 'budgets', 'goals', 'goalContributions'] && financeReader(sid))
           || (col in ['audit', 'usage'] && manager(sid));
       }
     }

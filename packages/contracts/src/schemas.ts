@@ -38,6 +38,12 @@ export const CONTACT_RELATIONS = ['personal', 'family', 'client', 'prospect', 's
 export const ACTIVITY_TYPES = ['call', 'message', 'meeting', 'email', 'note'] as const;
 export const ACCOUNT_TYPES = ['cash', 'bank', 'wallet', 'credit', 'other'] as const;
 export const OBLIGATION_KINDS = ['bill', 'debt', 'expected', 'subscription'] as const;
+export const PROJECT_STATUSES = ['active', 'paused', 'done', 'cancelled'] as const;
+export const OPPORTUNITY_STAGES = ['lead', 'contacted', 'proposal', 'negotiation', 'won', 'lost'] as const;
+export const DOCUMENT_TYPES = ['invoice', 'receipt', 'contract', 'id', 'license', 'warranty', 'vehicle', 'work', 'business', 'certificate', 'other'] as const;
+/** Archivos en Firestore (plan gratuito): ≤ 700 KB → ≤ ~934 mil caracteres en base64 (documento ≤ 1 MiB). */
+export const MAX_FILE_BYTES = 700 * 1024;
+export const MAX_FILE_BASE64 = Math.ceil(MAX_FILE_BYTES / 3) * 4;
 
 const spaceFields = { name: txt(60), timezone: zTimezone, currency: zCurrency };
 const contactFields = {
@@ -73,6 +79,9 @@ export const OPS = {
     tags: zTags,
     assigneeId: zId.optional(),
     contactId: zId.optional(),
+    projectId: zId.optional(),
+    /** Al completarla se crea la siguiente ocurrencia (requiere fecha). */
+    recurrence: zRecurrence.optional(),
   }),
   'task.update': z.object({
     taskId: zId,
@@ -83,6 +92,7 @@ export const OPS = {
     priority: z.enum(TASK_PRIORITIES).optional(),
     tags: zTags.optional(),
     assigneeId: zId.nullable().optional(),
+    projectId: zId.nullable().optional(),
   }),
   'task.setStatus': z.object({ taskId: zId, status: z.enum(TASK_STATUSES) }),
 
@@ -165,6 +175,47 @@ export const OPS = {
   'budget.set': z.object({ category: zCategory, limit: zAmount, currency: zCurrency }),
   'budget.remove': z.object({ category: zCategory }),
   'finance.summary': z.object({ month: zMonth.optional() }),
+  'goal.create': z.object({ requestId: zRequestId, name: txt(80), target: zAmount, currency: zCurrency, targetDate: zLocalDate.optional() }),
+  /** Aporte (positivo) o retiro (negativo) a una meta. No mueve saldos de cuentas: es un apartado. */
+  'goal.contribute': z.object({ requestId: zRequestId, goalId: zId, amount: z.number().int().refine((n) => n !== 0, 'El monto no puede ser cero').refine((n) => Math.abs(n) <= MAX_AMOUNT_MINOR), note: optTxt(120) }),
+  'goal.archive': z.object({ goalId: zId }),
+
+  'project.create': z.object({
+    requestId: zRequestId, name: txt(120), description: optTxt(4000), dueDate: zLocalDate.optional(),
+    budget: zAmount.optional(), currency: zCurrency.optional(), contactId: zId.optional(),
+  }),
+  'project.update': z.object({
+    projectId: zId, name: txt(120).optional(), description: optTxt(4000), dueDate: zLocalDate.nullable().optional(),
+    status: z.enum(PROJECT_STATUSES).optional(),
+  }),
+  'opportunity.create': z.object({
+    requestId: zRequestId, title: txt(120), contactId: zId.optional(), amount: zAmount.optional(), currency: zCurrency.optional(),
+    expectedClose: zLocalDate.optional(), nextAction: optTxt(200), notes: optTxt(2000),
+  }),
+  'opportunity.update': z.object({
+    opportunityId: zId, title: txt(120).optional(), amount: zAmount.nullable().optional(), expectedClose: zLocalDate.nullable().optional(),
+    nextAction: optTxt(200), notes: optTxt(2000),
+  }),
+  /** Ganada con `createReceivable` registra un cobro esperado (no dinero recibido). */
+  'opportunity.setStage': z.object({ opportunityId: zId, stage: z.enum(OPPORTUNITY_STAGES), createReceivable: z.boolean().optional() }),
+
+  'document.create': z.object({
+    requestId: zRequestId, title: txt(120), type: z.enum(DOCUMENT_TYPES), issuer: optTxt(80),
+    issuedAt: zLocalDate.optional(), expiresAt: zLocalDate.optional(), tags: zTags, contactId: zId.optional(),
+    remindDaysBefore: z.number().int().min(0).max(120).optional(),
+    file: z.object({ name: txt(120), base64: z.string().max(MAX_FILE_BASE64, 'El archivo supera el tamaño máximo (700 KB)') }).optional(),
+  }),
+  'document.update': z.object({
+    documentId: zId, title: txt(120).optional(), issuer: optTxt(80), expiresAt: zLocalDate.nullable().optional(), tags: zTags.optional(),
+  }),
+  'document.download': z.object({ documentId: zId }),
+  'document.delete': z.object({ documentId: zId }),
+
+  'account.export': z.object({}),
+  'account.delete': z.object({ confirm: z.literal('ELIMINAR', { message: 'Escribe ELIMINAR para confirmar' }) }),
+  'usage.get': z.object({}),
+  'admin.stats': z.object({}),
+  'admin.setPlan': z.object({ spaceId: zId, plan: z.enum(['free', 'premium', 'business']) }),
 
   'telegram.createLinkCode': z.object({}),
   'telegram.unlink': z.object({}),
@@ -177,4 +228,4 @@ export type OpInput<K extends OpName> = z.input<(typeof OPS)[K]>;
 export type OpData<K extends OpName> = z.output<(typeof OPS)[K]>;
 
 /** Operaciones que no se ejecutan dentro de un espacio. */
-export const SPACELESS_OPS = new Set<OpName>(['user.bootstrap', 'user.setDefaultSpace', 'space.create', 'telegram.createLinkCode', 'telegram.unlink']);
+export const SPACELESS_OPS = new Set<OpName>(['user.bootstrap', 'user.setDefaultSpace', 'space.create', 'telegram.createLinkCode', 'telegram.unlink', 'account.export', 'account.delete', 'admin.stats', 'admin.setPlan']);

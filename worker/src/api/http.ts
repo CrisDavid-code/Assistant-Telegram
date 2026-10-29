@@ -32,7 +32,7 @@ export async function handleApi(req: Request): Promise<Response> {
     const user = await verifyIdToken(token);
     const body = (await req.json().catch(() => ({}))) as { op?: string; spaceId?: string; data?: unknown };
     op = String(body.op);
-    const result = await runOp({ uid: user.uid, email: user.email, name: user.name, source: 'pwa' }, op, body.spaceId, body.data);
+    const result = await runOp({ uid: user.uid, email: user.email, name: user.name, emailVerified: user.emailVerified, source: 'pwa' }, op, body.spaceId, body.data);
     return json({ result: result ?? null }, 200, h);
   } catch (err) {
     if (err instanceof DomainError) return json({ error: { code: err.code, message: err.message } }, STATUS[err.code], h);

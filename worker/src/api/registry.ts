@@ -8,12 +8,20 @@ import * as contacts from '../contacts/service';
 import * as finance from '../finance/service';
 import * as link from '../telegram/link';
 import { checkQuota } from '../subscriptions/quota';
+import * as goals from '../finance/goals';
+import * as projects from '../projects/service';
+import * as crm from '../crm/service';
+import * as documents from '../documents/service';
+import * as account from '../account/service';
+import * as admin from '../admin/service';
 
 export interface Caller {
   uid: string;
   email: string | null;
   name: string | null;
   source: Source;
+  /** Correo verificado según el token de sesión (Telegram y pruebas lo omiten). */
+  emailVerified?: boolean;
   /** Conversación del asistente: `tg_<chatId>` o `pwa_<uid>`. */
   convKey?: string;
 }
@@ -47,6 +55,19 @@ const inSpace: SpaceHandlers = {
   'budget.set': finance.setBudget,
   'budget.remove': finance.removeBudget,
   'finance.summary': finance.getFinancialSummary,
+  'goal.create': goals.createGoal,
+  'goal.contribute': goals.contributeGoal,
+  'goal.archive': goals.archiveGoal,
+  'project.create': projects.createProject,
+  'project.update': projects.updateProject,
+  'opportunity.create': crm.createOpportunity,
+  'opportunity.update': crm.updateOpportunity,
+  'opportunity.setStage': crm.setOpportunityStage,
+  'document.create': documents.createDocument,
+  'document.update': documents.updateDocument,
+  'document.download': documents.downloadDocument,
+  'document.delete': documents.deleteDocument,
+  'usage.get': admin.getUsage,
 };
 
 /** Registrado por el módulo del asistente (evita dependencia circular). */
@@ -70,11 +91,17 @@ export async function runOp(caller: Caller, op: string, spaceId: unknown, raw: u
       case 'space.create': return spaces.createBusinessSpace(caller.uid, data, caller.source);
       case 'telegram.createLinkCode': return link.createLinkCode(caller.uid);
       case 'telegram.unlink': return link.unlinkTelegram(caller.uid, caller.source);
+      case 'account.export': return account.exportAccount(caller.uid);
+      case 'account.delete': return account.deleteAccount(caller.uid);
+      case 'admin.stats': return admin.adminStats(caller.uid);
+      case 'admin.setPlan': return admin.adminSetPlan(caller.uid, data);
     }
   }
   if (typeof spaceId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(spaceId)) fail('invalid-argument', 'Falta el espacio.');
   if (name === 'member.respond') return spaces.respondInvite(caller.uid, spaceId as string, data, caller.source);
 
+  // Invitar a otras personas exige correo verificado: evita invitaciones desde cuentas falsas.
+  if (name === 'member.invite' && caller.source === 'pwa' && caller.emailVerified === false) fail('failed-precondition', 'Verifica tu correo electrónico antes de invitar personas.');
   const ctx = await loadCtx(caller.uid, spaceId as string, caller.source);
   const handler = (inSpace[name] ?? assistantHandlers[name]) as ((c: Ctx, d: never, k: Caller) => Promise<unknown>) | undefined;
   if (!handler) fail('invalid-argument', 'Operación no disponible.');

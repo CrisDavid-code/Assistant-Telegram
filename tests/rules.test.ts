@@ -82,3 +82,16 @@ describe('reglas de Firestore', () => {
     await assertFails(getDoc(doc(as('ana'), 'conversations/tg_1')));
   });
 });
+
+describe('reglas: módulos nuevos', () => {
+  it('miembros leen proyectos, oportunidades y documentos; nadie lee el contenido de archivos directo', async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      const db = c.firestore();
+      for (const p of ['projects/p1', 'opportunities/o1', 'documents/d1', 'documentFiles/d1', 'goals/g1']) await setDoc(doc(db, `spaces/biz/${p}`), { x: 1 });
+    });
+    for (const p of ['projects/p1', 'opportunities/o1', 'documents/d1']) await assertSucceeds(getDoc(doc(as('emp'), `spaces/biz/${p}`)));
+    await assertFails(getDoc(doc(as('emp'), 'spaces/biz/goals/g1')));
+    await assertSucceeds(getDoc(doc(as('ana'), 'spaces/biz/goals/g1')));
+    await assertFails(getDoc(doc(as('ana'), 'spaces/biz/documentFiles/d1')));
+  });
+});

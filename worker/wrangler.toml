@@ -10,6 +10,12 @@ FIREBASE_PROJECT_ID = ""      # id del proyecto de Firebase
 ALLOWED_ORIGINS = ""          # p. ej. https://lifeos.aguiteks.com
 TELEGRAM_BOT_USERNAME = ""    # sin @
 APP_URL = ""                  # URL pública de la PWA
+ADMIN_UIDS = ""               # uid(s) de administradores de la plataforma, separados por coma
+ADMIN_TELEGRAM_CHAT_ID = ""   # chat de Telegram para alertas operativas (opcional)
+
+# Workers AI (Whisper) para notas de voz: incluido en el plan gratuito.
+[ai]
+binding = "AI"
 
 [triggers]
 crons = ["* * * * *"]         # recordatorios: cada minuto

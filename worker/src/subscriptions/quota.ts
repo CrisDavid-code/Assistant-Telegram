@@ -13,6 +13,6 @@ export async function checkQuota(ctx: Ctx, op: string) {
   await db.runTransaction(async (tx) => {
     const used = ((await tx.get(ref)).get(metric) as number | undefined) ?? 0;
     if (used >= limit) fail('resource-exhausted', `Alcanzaste el límite mensual de tu plan (${limit} mensajes al asistente).`);
-    tx.set(ref, { [metric]: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    tx.set(ref, { [metric]: FieldValue.increment(1), month: ref.id, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
   });
 }

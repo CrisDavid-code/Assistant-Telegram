@@ -1,6 +1,7 @@
 import { logger } from '../shared/log';
 import { rulesProvider } from './rules';
 import { claudeProvider } from './claude';
+import { workersAITranscriber } from './whisper';
 import { zIntent, type AIProvider, type Intent, type InterpretContext } from './types';
 
 /** Proveedor de IA externo (opcional). Sin credenciales, el asistente funciona solo con reglas. */
@@ -15,6 +16,12 @@ export const getLLM = () => {
     llm = key.startsWith('sk-ant-') ? claudeProvider(key) : null;
   }
   return llm;
+};
+
+/** Voz → texto: Workers AI (gratis) si está el binding; si no, el proveedor de IA si lo implementa. */
+export const getTranscriber = (): { transcribe(audio: Uint8Array, mime: string): Promise<string> } | null => {
+  const llm = getLLM();
+  return workersAITranscriber() ?? (llm?.transcribe ? { transcribe: llm.transcribe.bind(llm) } : null);
 };
 
 /** Reglas primero (gratis, deterministas); si no entienden y hay IA configurada, se consulta a la IA. */

@@ -59,6 +59,8 @@ export interface TaskDoc {
   tags: string[];
   assigneeId: string | null;
   contactId: string | null;
+  projectId: string | null;
+  recurrence: Recurrence | null;
   createdBy: string;
   source: Source;
   completedAt: Ts | null;
@@ -186,4 +188,63 @@ export interface FinanceSummary {
   byCategory: Record<string, Record<string, number>>; // moneda → categoría → gasto
   budgets: { category: string; currency: Currency; limit: number; spent: number }[];
   truncated: boolean;
+}
+
+export interface GoalDoc {
+  name: string;
+  target: number;
+  saved: number;
+  currency: Currency;
+  targetDate: string | null;
+  status: 'active' | 'reached' | 'archived';
+  createdBy: string;
+  createdAt: Ts;
+  updatedAt: Ts;
+}
+
+export interface ProjectDoc {
+  name: string;
+  description: string | null;
+  status: 'active' | 'paused' | 'done' | 'cancelled';
+  dueDate: string | null;
+  budget: number | null;
+  currency: Currency | null;
+  contactId: string | null;
+  createdBy: string;
+  createdAt: Ts;
+  updatedAt: Ts;
+}
+
+export type OpportunityStage = 'lead' | 'contacted' | 'proposal' | 'negotiation' | 'won' | 'lost';
+
+export interface OpportunityDoc {
+  title: string;
+  contactId: string | null;
+  stage: OpportunityStage;
+  amount: number | null;
+  currency: Currency | null;
+  expectedClose: string | null;
+  nextAction: string | null;
+  notes: string | null;
+  obligationId: string | null; // cobro esperado creado al ganarla
+  closedAt: Ts | null;
+  createdBy: string;
+  createdAt: Ts;
+  updatedAt: Ts;
+}
+
+export interface DocumentDoc {
+  title: string;
+  type: string;
+  issuer: string | null;
+  issuedAt: string | null;
+  expiresAt: string | null;
+  tags: string[];
+  contactId: string | null;
+  file: { name: string; mime: string; size: number } | null; // contenido en documentFiles/{id}
+  reminderId: string | null;
+  createdBy: string;
+  source: Source;
+  createdAt: Ts;
+  updatedAt: Ts;
 }

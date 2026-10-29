@@ -52,6 +52,8 @@ export interface InterpretContext {
   now: string; // ISO con zona
   timezone: string;
   currency: string;
+  /** Para registrar el consumo de IA del espacio (tokens). */
+  spaceId?: string;
 }
 
 /** Proveedor intercambiable. Lo que no implementa se reporta como "no configurado" al usuario. */

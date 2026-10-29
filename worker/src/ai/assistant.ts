@@ -44,7 +44,7 @@ export const HELP = [
 
 function ictx(ctx: Ctx): InterpretContext {
   const now = nowIn(ctx.space.timezone);
-  return { today: now.toISODate()!, now: now.toISO()!, timezone: ctx.space.timezone, currency: ctx.space.currency };
+  return { today: now.toISODate()!, now: now.toISO()!, timezone: ctx.space.timezone, currency: ctx.space.currency, spaceId: ctx.spaceId };
 }
 
 async function saveConv(key: string, uid: string, patch: Partial<Conversation>) {

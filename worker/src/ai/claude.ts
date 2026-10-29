@@ -3,6 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { CURRENCY_CODES, parseAmount, type Currency } from '@lifeos/contracts';
 import type { AIProvider, Intent, InterpretContext } from './types';
+import { db, FieldValue } from '../shared/firebase';
 
 // Proveedor de IA con Claude (Messages API, salidas estructuradas). Solo PROPONE una intención:
 // la salida se valida con zIntent y pasa por runOp (autorización) y confirmación como cualquier otra.
@@ -77,6 +78,11 @@ export function claudeProvider(apiKey: string): AIProvider {
       system: SYSTEM,
       messages: [{ role: 'user', content: [{ type: 'text', text: `Fecha y hora actuales: ${ctx.now} (${ctx.timezone}). Moneda predeterminada: ${ctx.currency}.` }, ...content] }],
     });
+    // Consumo por espacio y mes (métrica de costos); si falla el registro no se bloquea la respuesta.
+    if (ctx.spaceId) {
+      const month = ctx.today.slice(0, 7);
+      await db.doc(`spaces/${ctx.spaceId}/usage/${month}`).set({ month, aiInputTokens: FieldValue.increment(res.usage.input_tokens), aiOutputTokens: FieldValue.increment(res.usage.output_tokens) }, { merge: true }).catch(() => undefined);
+    }
     // Rechazo o salida truncada: no se adivina, se responde "no entendí".
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens' || !res.parsed_output) return { type: 'unknown' };
     return toIntent(res.parsed_output, ctx);

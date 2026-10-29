@@ -6,7 +6,7 @@ import { loadCtx } from '../auth/context';
 import { runOp, type Caller } from '../api/registry';
 import { activeSpaces } from '../spaces/service';
 import { answer, HELP, proposeFrom, proposePayment, type Reply } from '../ai/assistant';
-import { getLLM } from '../ai/provider';
+import { getLLM, getTranscriber } from '../ai/provider';
 import { nowIn } from '../shared/time';
 import { getUpcomingObligations } from '../finance/service';
 import { CODE_RE, linkChat, uidForChat, unlinkTelegram } from './link';
@@ -238,11 +238,11 @@ async function onCallback(cb: NonNullable<TgUpdate['callback_query']>, chatId: n
 }
 
 async function onVoice(msg: TgMessage, chatId: number, run: Run) {
-  const llm = getLLM();
-  if (!llm?.transcribe) return send(chatId, 'Todavía no puedo escuchar notas de voz: la transcripción no está configurada. Escríbeme el mensaje, por favor.');
+  const stt = getTranscriber();
+  if (!stt) return send(chatId, 'Todavía no puedo escuchar notas de voz: la transcripción no está configurada. Escríbeme el mensaje, por favor.');
   if ((msg.voice!.file_size ?? 0) > MAX_VOICE_BYTES || msg.voice!.duration > 120) return send(chatId, 'La nota de voz es muy larga (máximo 2 minutos).');
   const file = await telegram.getFile(msg.voice!.file_id);
-  const text = (await llm.transcribe(file.bytes, msg.voice!.mime_type ?? 'audio/ogg')).trim();
+  const text = (await stt.transcribe(file.bytes, msg.voice!.mime_type ?? 'audio/ogg').catch(() => '')).trim();
   if (!text) return send(chatId, 'No pude entender la nota de voz. ¿Me lo escribes?');
   await send(chatId, `🎙 Entendí: «${text.slice(0, 500)}»`);
   return send(chatId, await run('assistant.message', { text: text.slice(0, 1000) }));
@@ -260,7 +260,7 @@ async function onImage(msg: TgMessage, chatId: number, caller: Caller, spaceId: 
   const file = await telegram.getFile(fileId);
   const now = nowIn(ctx.space.timezone);
   // La imagen se procesa en memoria y no se guarda (sin retención). El resultado SIEMPRE se confirma.
-  const intent = await llm.extractFromImage(file.bytes, mime, { today: now.toISODate()!, now: now.toISO()!, timezone: ctx.space.timezone, currency: ctx.space.currency })
+  const intent = await llm.extractFromImage(file.bytes, mime, { today: now.toISODate()!, now: now.toISO()!, timezone: ctx.space.timezone, currency: ctx.space.currency, spaceId: ctx.spaceId })
     .catch((err) => {
       logger.warn('ai.image.failed', { error: (err as Error).message });
       return { type: 'unknown' as const };

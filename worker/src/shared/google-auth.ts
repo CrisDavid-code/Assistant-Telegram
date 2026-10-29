@@ -38,7 +38,7 @@ export async function accessToken(): Promise<string> {
 
 const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'));
 
-export interface IdentityClaims { uid: string; email: string | null; name: string | null }
+export interface IdentityClaims { uid: string; email: string | null; name: string | null; emailVerified: boolean }
 
 /** Verifica el ID token de Firebase Auth: firma de Google, emisor, audiencia y vigencia. */
 export async function verifyIdToken(token: string): Promise<IdentityClaims> {
@@ -49,7 +49,7 @@ export async function verifyIdToken(token: string): Promise<IdentityClaims> {
       ? decodeJwt(token)
       : (await jwtVerify(token, JWKS, { issuer: `https://securetoken.google.com/${project}`, audience: project, algorithms: ['RS256'] })).payload;
     if (!claims.sub) throw new Error('sin sub');
-    return { uid: claims.sub, email: (claims.email as string) ?? null, name: (claims.name as string) ?? null };
+    return { uid: claims.sub, email: (claims.email as string) ?? null, name: (claims.name as string) ?? null, emailVerified: claims.email_verified === true };
   } catch {
     throw new DomainError('unauthenticated', 'Tu sesión venció. Vuelve a iniciar sesión.');
   }
@@ -67,4 +67,16 @@ export async function userByEmail(email: string): Promise<{ uid: string; display
   if (!res.ok) throw new Error(`Auth lookup: ${res.status}`);
   const user = ((await res.json()) as { users?: { localId: string; displayName?: string }[] }).users?.[0];
   return user ? { uid: user.localId, displayName: user.displayName ?? null } : null;
+}
+
+/** Elimina el usuario de Firebase Auth (eliminación de cuenta). */
+export async function deleteAuthUser(uid: string) {
+  const host = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  const base = host ? `http://${host}/identitytoolkit.googleapis.com` : 'https://identitytoolkit.googleapis.com';
+  const res = await fetch(`${base}/v1/projects/${firebaseProject()}/accounts:delete`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${await accessToken()}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ localId: uid }),
+  });
+  if (!res.ok) throw new Error(`Auth delete: ${res.status}`);
 }

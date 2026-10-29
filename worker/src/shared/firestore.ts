@@ -187,6 +187,20 @@ export class Query {
     const where = this.filters.length === 0 ? undefined : this.filters.length === 1 ? this.filters[0] : { compositeFilter: { op: 'AND', filters: this.filters } };
     return { from: [{ collectionId: this.collectionId, allDescendants: this.allDescendants }], where, orderBy: this.orders.length ? this.orders : undefined, limit: this.max };
   }
+  /**
+   * Conteo y sumas en el servidor (runAggregationQuery): no lee los documentos. Cada agregación va en su
+   * propia consulta: si se combinan, un documento sin uno de los campos sumados queda fuera de todas.
+   */
+  async aggregate(sums: string[] = []): Promise<{ count: number; sums: Record<string, number> }> {
+    const url = `${root()}${this.parent ? `/${this.parent}` : ''}:runAggregationQuery`;
+    const one = async (agg: FsValue) => {
+      const [row] = (await http('POST', url, { structuredAggregationQuery: { structuredQuery: this.structured(), aggregations: [{ alias: 'v', ...agg }] } })) as { result?: { aggregateFields?: Record<string, FsValue> } }[];
+      return Number(decode(row?.result?.aggregateFields?.v ?? { integerValue: '0' })) || 0;
+    };
+    const [count, ...values] = await Promise.all([one({ count: {} }), ...sums.map((f) => one({ sum: { field: { fieldPath: f } } }))]);
+    return { count: count!, sums: Object.fromEntries(sums.map((f, i) => [f, values[i]!])) };
+  }
+
   async get(transaction?: string) {
     const url = `${root()}${this.parent ? `/${this.parent}` : ''}:runQuery`;
     const rows = (await http('POST', url, { structuredQuery: this.structured(), ...(transaction ? { transaction } : {}) })) as { document?: { name: string; fields?: Record<string, FsValue> } }[];
@@ -264,6 +278,10 @@ const toAdminError = (e: unknown) => {
 };
 
 export const db = {
+  /** Borra en lotes de hasta 500 escrituras (límite de commit). */
+  async deleteMany(refs: DocumentReference[]) {
+    for (let i = 0; i < refs.length; i += 500) await commit(refs.slice(i, i + 500).map((r) => ({ delete: r.name })));
+  },
   doc: (path: string) => new DocumentReference(path),
   collection: (path: string) => new CollectionReference(path),
   collectionGroup: (id: string) => new Query('', id, true),
